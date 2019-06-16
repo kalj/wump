@@ -1,0 +1,8 @@
+[package]
+name = "display"
+version = "0.1.0"
+
+
+[dependencies]
+sysfs_gpio = "0.5"
+retry = "0.5.1"
