@@ -20,8 +20,8 @@ fn main() {
     lcd.init();
 
     // Send some test
-    lcd.print_string("Raspberry Pi", lcd::LCD_LINE_1);
-    lcd.print_string("16x2 LCD Test", lcd::LCD_LINE_2);
+    lcd.print_string("Raspberry Pi", lcd::LINE_1);
+    lcd.print_string("16x2 LCD Test", lcd::LINE_2);
 
     // 3 second delay
     sleep(Duration::new(3,0));
@@ -29,8 +29,8 @@ fn main() {
     // while i < 256 {
     //     let line1 : Vec<u8> = (0..16).map(|x| (x+i) as u8).collect();
     //     let line2 : Vec<u8> = (16..32).map(|x| (x+i) as u8).collect();
-    //     lcd_bytestr(&pins, &line1, LCD_LINE_1);
-    //     lcd_bytestr(&pins, &line2, LCD_LINE_2);
+    //     lcd.send_bytestr(&line1, lcd::LINE_1);
+    //     lcd.send_bytestr(&line2, lcd::LINE_2);
     //     i += 32;
 
     //     println!("currently displaying:");
@@ -57,13 +57,13 @@ fn main() {
         }
 
         let mut line2= "";
-        if line1.len() > lcd::LCD_WIDTH {
-            line2 = &line1[lcd::LCD_WIDTH..];
-            line1 = &line1[..lcd::LCD_WIDTH];
+        if line1.len() > lcd::WIDTH {
+            line2 = &line1[lcd::WIDTH..];
+            line1 = &line1[..lcd::WIDTH];
         }
 
-        lcd.print_string(line1,lcd::LCD_LINE_1);
-        lcd.print_string(line2,lcd::LCD_LINE_2);
+        lcd.print_string(line1,lcd::LINE_1);
+        lcd.print_string(line2,lcd::LINE_2);
 
         sleep(Duration::new(1,0));
     }

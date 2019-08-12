@@ -8,12 +8,12 @@ use std::thread::sleep;
 use std::cmp;
 
 // Define some device constants
-pub const LCD_WIDTH: usize = 16;    // Maximum characters per line
+pub const WIDTH: usize = 16;    // Maximum characters per line
 const LCD_CHR: u8 = 1;
 const LCD_CMD: u8 = 0;
 
-pub const LCD_LINE_1: u8 = 0x80; // LCD RAM address for the 1st line
-pub const LCD_LINE_2: u8 = 0xC0; // LCD RAM address for the 2nd line
+pub const LINE_1: u8 = 0x80; // LCD RAM address for the 1st line
+pub const LINE_2: u8 = 0xC0; // LCD RAM address for the 2nd line
 
 // Timing constants
 const E_PULSE: u32 = 500_000;
@@ -191,7 +191,7 @@ impl Lcd {
 
         self.send_byte(line, LCD_CMD);
 
-        let n = cmp::min(LCD_WIDTH,bytes.len());
+        let n = cmp::min(WIDTH,bytes.len());
 
         let mut i=0;
 
@@ -203,7 +203,7 @@ impl Lcd {
         }
 
         // write padding
-        while i<LCD_WIDTH {
+        while i<WIDTH {
             self.send_byte(' ' as u8, LCD_CHR);
             i+=1;
         }
