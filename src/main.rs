@@ -1,7 +1,7 @@
 
-
 mod lcd;
 
+use lcd::Lcd;
 use std::time::Duration;
 use std::thread::sleep;
 use std::io::{self, Write};
@@ -14,14 +14,14 @@ const LCD_D6: u64 = 19;
 const LCD_D7: u64 = 26;
 
 fn main() {
-    let pins = lcd::create_pins(LCD_E,LCD_RS,LCD_D4,LCD_D5,LCD_D6,LCD_D7);
+    let lcd = Lcd::new(LCD_E,LCD_RS,LCD_D4,LCD_D5,LCD_D6,LCD_D7);
 
     // Initialise display
-    lcd::lcd_init(&pins);
+    lcd.init();
 
     // Send some test
-    lcd::lcd_string(&pins, "Raspberry Pi", lcd::LCD_LINE_1);
-    lcd::lcd_string(&pins, "16x2 LCD Test", lcd::LCD_LINE_2);
+    lcd.print_string("Raspberry Pi", lcd::LCD_LINE_1);
+    lcd.print_string("16x2 LCD Test", lcd::LCD_LINE_2);
 
     // 3 second delay
     sleep(Duration::new(3,0));
@@ -62,11 +62,10 @@ fn main() {
             line1 = &line1[..lcd::LCD_WIDTH];
         }
 
-        lcd::lcd_string(&pins,line1,lcd::LCD_LINE_1);
-        lcd::lcd_string(&pins,line2,lcd::LCD_LINE_2);
+        lcd.print_string(line1,lcd::LCD_LINE_1);
+        lcd.print_string(line2,lcd::LCD_LINE_2);
 
         sleep(Duration::new(1,0));
     }
 
-    lcd::destroy_pins(&pins);
 }
