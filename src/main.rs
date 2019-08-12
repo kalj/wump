@@ -6,15 +6,11 @@ use std::time::Duration;
 use std::thread::sleep;
 use std::io::{self, Write};
 
-const LCD_E: u64 = 21;
-const LCD_RS: u64 = 20;
-const LCD_D4: u64 = 6;
-const LCD_D5: u64 = 13;
-const LCD_D6: u64 = 19;
-const LCD_D7: u64 = 26;
+const I2C_PATH: &str = "/dev/i2c-1";
+const LCD_ADDR: u16 = 0x27;
 
 fn main() {
-    let lcd = Lcd::new(LCD_E,LCD_RS,LCD_D4,LCD_D5,LCD_D6,LCD_D7);
+    let mut lcd = Lcd::new(I2C_PATH, LCD_ADDR);
 
     // Initialise display
     lcd.init();
@@ -68,4 +64,6 @@ fn main() {
         sleep(Duration::new(1,0));
     }
 
+    lcd.print_string("Bye!",lcd::LINE_1);
+    lcd.print_string("",lcd::LINE_2);
 }

@@ -1,8 +1,7 @@
-extern crate sysfs_gpio;
-extern crate retry;
+extern crate i2cdev;
 
-use self::sysfs_gpio::{Direction, Pin};
-use self::retry::{retry,delay};
+use self::i2cdev::core::*;
+use self::i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
 use std::time::Duration;
 use std::thread::sleep;
 use std::cmp;
@@ -11,6 +10,8 @@ use std::cmp;
 pub const WIDTH: usize = 16;    // Maximum characters per line
 const LCD_CHR: u8 = 1;
 const LCD_CMD: u8 = 0;
+
+const BACKLIGHT_BIT: u8 = 0x08;
 
 pub const LINE_1: u8 = 0x80; // LCD RAM address for the 1st line
 pub const LINE_2: u8 = 0xC0; // LCD RAM address for the 2nd line
@@ -29,9 +30,8 @@ const CODE_CHAR_UNKNOWN: u8 = 0xff;
 
 pub struct Lcd
 {
-    e_pin: Pin,
-    rs_pin: Pin,
-    d_pins: [Pin;4],
+    dev: LinuxI2CDevice,
+    backlight: bool
 }
 
 fn decode(s: &str) ->Vec<u8>{
@@ -54,42 +54,19 @@ fn decode(s: &str) ->Vec<u8>{
     ).collect()
 }
 
-fn set_pin_dir(pin: & Pin, dir: Direction) -> std::result::Result<(), retry::Error<sysfs_gpio::Error>>
-{
-    retry(delay::Fixed::from_millis(100).take(3), || pin.set_direction(dir))
-}
-
 impl Lcd {
-    pub fn new(e_pin_nr: u64, rs_pin_nr: u64, d4_pin_nr: u64,
-               d5_pin_nr: u64, d6_pin_nr: u64, d7_pin_nr: u64) -> Lcd
+    pub fn new(path: &str, addr: u16) -> Lcd
     {
-        let ep = Pin::new(e_pin_nr);
-        ep.export().expect("Failed exporting E pin");
-        set_pin_dir(&ep, Direction::Out).expect("Failed setting direction of E pin");
-
-        let rsp = Pin::new(rs_pin_nr);
-        rsp.export().expect("Failed exporting RS pin");
-        set_pin_dir(&rsp, Direction::Out).expect("Failed setting direction of RS pin");
-
-        let dps = [ Pin::new(d4_pin_nr),
-                    Pin::new(d5_pin_nr),
-                    Pin::new(d6_pin_nr),
-                    Pin::new(d7_pin_nr)];
-
-        for p in &dps {
-            p.export().expect("Failed exporting data pin");
-            set_pin_dir(&p, Direction::Out).expect("Failed setting direction of data pin");
-        }
-
+        let dev = LinuxI2CDevice::new(path, addr).expect("Apa!");
         Lcd {
-            e_pin: ep,
-            rs_pin: rsp,
-            d_pins: dps,
+            dev: dev,
+            backlight: true
         }
     }
 
-    pub fn init(&self) {
+    pub fn init(&mut self) {
         // Initialise display
+
         self.send_byte(0x33,LCD_CMD); // 110011 Initialise
         self.send_byte(0x32,LCD_CMD); // 110010 Initialise
         self.send_byte(0x06,LCD_CMD); // 000110 Cursor move direction
@@ -146,47 +123,49 @@ impl Lcd {
         self.send_byte(0x0F,LCD_CHR);
     }
 
-    fn send_byte(&self, bits: u8, mode: u8) {
+    fn send_byte(&mut self, bits: u8, mode: u8) {
         // Send byte to data pins
         // bits = data
         // mode = True  for character
         //        False for command
 
-        self.rs_pin.set_value(mode).expect("Failed setting value of RS pin");
+        const RS_BIT: u8 = 0b1;
+        const EN_BIT: u8 = 0b100;
+        let bl: u8 = if self.backlight {BACKLIGHT_BIT} else {0};
+        const DATA_BITS: u8 = 0xF0;
 
         // High bits
-        for (i,p) in self.d_pins.iter().enumerate() {
-            p.set_value( (bits>>(4+i)) & 0x01).expect("Failed setting value of data pin");
-        }
+        let data = (bits & DATA_BITS) | (mode & RS_BIT) | bl;
 
-        // Toggle 'Enable' pin
-        self.toggle_enable();
+        self.dev.smbus_write_byte(data).unwrap();
+        sleep(Duration::new(0,E_DELAY));
+
+        self.dev.smbus_write_byte(data | EN_BIT).unwrap();
+        sleep(Duration::new(0,E_PULSE));
+
+        self.dev.smbus_write_byte(data).unwrap(); // & (~0x4)
+        sleep(Duration::new(0,E_DELAY));
+
 
         // Low bits
-        for (i,p) in self.d_pins.iter().enumerate() {
-            p.set_value( (bits >> i) & 0x01).expect("Failed setting value of pin");
-        }
+        let data = ((bits<<4) & DATA_BITS) | (mode & RS_BIT) | bl;
 
-        // Toggle 'Enable' pin
-        self.toggle_enable();
-    }
-
-    fn toggle_enable(&self) {
-        // Toggle enable
+        self.dev.smbus_write_byte(data).unwrap();
         sleep(Duration::new(0,E_DELAY));
-        self.e_pin.set_value(1).expect("Failed setting value of E pin");
+
+        self.dev.smbus_write_byte(data | EN_BIT).unwrap();
         sleep(Duration::new(0,E_PULSE));
-        self.e_pin.set_value(0).expect("Failed setting value of E pin");
+
+        self.dev.smbus_write_byte(data).unwrap(); // & (~0x4)
         sleep(Duration::new(0,E_DELAY));
     }
 
-
-    pub fn print_string(&self, message: & str, line: u8) {
+    pub fn print_string(&mut self, message: & str, line: u8) {
         // Decode and pass
         self.print_bytestr(&decode(message),line);
     }
 
-    fn print_bytestr(&self, bytes: &[u8], line: u8) {
+    fn print_bytestr(&mut self, bytes: &[u8], line: u8) {
         // Send string to display
 
         self.send_byte(line, LCD_CMD);
@@ -208,17 +187,17 @@ impl Lcd {
             i+=1;
         }
     }
-}
 
-impl Drop for Lcd
-{
-    fn drop(&mut self)
+    pub fn toggle_backlight(&mut self)
     {
-        self.e_pin.unexport().expect("Failed unexporting E pin");
-        self.rs_pin.unexport().expect("Failed unexporting RS pin");
-        for (i, p) in self.d_pins.iter().enumerate() {
-            println!("Unexporting data pin {}",i);
-            p.unexport().expect("Failed unexporting data pin");
+        self.backlight = !self.backlight;
+        if self.backlight {
+            self.send_byte(BACKLIGHT_BIT, LCD_CMD);
         }
+        else {
+            self.send_byte(0, LCD_CMD);
+        }
+
     }
 }
+
