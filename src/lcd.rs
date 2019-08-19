@@ -1,7 +1,7 @@
 extern crate i2cdev;
 
 use self::i2cdev::core::*;
-use self::i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
+use self::i2cdev::linux::{LinuxI2CDevice};
 use std::time::Duration;
 use std::thread::sleep;
 use std::cmp;

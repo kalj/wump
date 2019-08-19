@@ -7,7 +7,6 @@ use chrono::{Local, DateTime};
 use lcd::Lcd;
 use std::time::Duration;
 use std::thread::sleep;
-use std::io::{self, Write};
 
 const I2C_PATH: &str = "/dev/i2c-1";
 const LCD_ADDR: u16 = 0x27;
