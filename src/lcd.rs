@@ -11,7 +11,9 @@ pub const WIDTH: usize = 16;    // Maximum characters per line
 const LCD_CHR: u8 = 1;
 const LCD_CMD: u8 = 0;
 
-const BACKLIGHT_BIT: u8 = 0x08;
+const BL_BIT: u8 = 0x08;
+const RS_BIT: u8 = 0b1;
+const EN_BIT: u8 = 0b100;
 
 pub const LINE_1: u8 = 0x80; // LCD RAM address for the 1st line
 pub const LINE_2: u8 = 0xC0; // LCD RAM address for the 2nd line
@@ -63,21 +65,19 @@ fn fill_buf(buf: &mut [u8;WIDTH], vec: &[u8])
     }
 }
 
-pub struct Lcd
+struct LcdDev
 {
     dev: LinuxI2CDevice,
-    backlight: bool,
-    buffer: [[u8;WIDTH];2]
+    backlight: bool
 }
 
-impl Lcd {
-    pub fn new(path: &str, addr: u16) -> Lcd
+impl LcdDev {
+    pub fn new(path: &str, addr: u16, bl: bool) -> LcdDev
     {
         let dev = LinuxI2CDevice::new(path, addr).expect("Failed setting up I2C device for LCD.");
-        Lcd {
+        LcdDev {
             dev: dev,
-            backlight: true,
-            buffer: [[0x20;WIDTH];2]
+            backlight: bl
         }
     }
 
@@ -140,15 +140,21 @@ impl Lcd {
         self.send_byte(0x0F,LCD_CHR);
     }
 
+    fn get_backlight(&self) -> bool {
+        self.backlight
+    }
+
+    fn set_backlight(&mut self, bl: bool) {
+        self.backlight = bl
+    }
+
     fn send_byte(&mut self, bits: u8, mode: u8) {
         // Send byte to data pins
         // bits = data
         // mode = True  for character
         //        False for command
 
-        const RS_BIT: u8 = 0b1;
-        const EN_BIT: u8 = 0b100;
-        let bl: u8 = if self.backlight {BACKLIGHT_BIT} else {0};
+        let bl: u8 = if self.backlight {BL_BIT} else {0};
         const DATA_BITS: u8 = 0xF0;
 
         // High bits
@@ -196,11 +202,33 @@ impl Lcd {
         // Decode and pass
         self.print_bytestr(&decode(message),line);
     }
+}
+
+
+pub struct Lcd
+{
+    dev: LcdDev,
+    buffer: [[u8;WIDTH];2]
+}
+
+impl Lcd {
+    pub fn new(path: &str, addr: u16) -> Lcd
+    {
+        let dev = LcdDev::new(path, addr, true);
+        Lcd {
+            dev: dev,
+            buffer: [[0x20;WIDTH];2]
+        }
+    }
+
+    pub fn init(&mut self) {
+        self.dev.init();
+    }
 
     fn update(&mut self)
     {
-        self.print_buf(self.buffer[0],LINE_1);
-        self.print_buf(self.buffer[1],LINE_2);
+        self.dev.print_buf(self.buffer[0],LINE_1);
+        self.dev.print_buf(self.buffer[1],LINE_2);
     }
 
 
@@ -213,13 +241,14 @@ impl Lcd {
 
     pub fn set_backlight(&mut self, state: bool)
     {
-        self.backlight = state;
+        self.dev.set_backlight(state);
         self.update();
     }
 
     pub fn toggle_backlight(&mut self)
     {
-        self.backlight = !self.backlight;
+        let bl = self.dev.get_backlight();
+        self.dev.set_backlight(!bl);
         self.update();
     }
 }
