@@ -28,12 +28,6 @@ const CODE_CHAR_AE_L: u8 = 0xe1;
 const CODE_CHAR_OE_L: u8 = 0xef;
 const CODE_CHAR_UNKNOWN: u8 = 0xff;
 
-pub struct Lcd
-{
-    dev: LinuxI2CDevice,
-    backlight: bool
-}
-
 fn decode(s: &str) ->Vec<u8>{
 
     s.chars().map(|c|
@@ -54,13 +48,36 @@ fn decode(s: &str) ->Vec<u8>{
     ).collect()
 }
 
+fn fill_buf(buf: &mut [u8;WIDTH], vec: &[u8])
+{
+    let n = cmp::min(WIDTH,vec.len());
+
+    // write actual string
+    for i in 0..n {
+        buf[i] = vec[i];
+    }
+
+    // write padding
+    for i in n..WIDTH {
+        buf[i] = ' ' as u8;
+    }
+}
+
+pub struct Lcd
+{
+    dev: LinuxI2CDevice,
+    backlight: bool,
+    buffer: [[u8;WIDTH];2]
+}
+
 impl Lcd {
     pub fn new(path: &str, addr: u16) -> Lcd
     {
-        let dev = LinuxI2CDevice::new(path, addr).expect("Apa!");
+        let dev = LinuxI2CDevice::new(path, addr).expect("Failed setting up I2C device for LCD.");
         Lcd {
             dev: dev,
-            backlight: true
+            backlight: true,
+            buffer: [[0x20;WIDTH];2]
         }
     }
 
@@ -160,44 +177,49 @@ impl Lcd {
         sleep(Duration::new(0,E_DELAY));
     }
 
-    pub fn print_string(&mut self, message: & str, line: u8) {
+    fn print_buf(&mut self, buf: [u8;WIDTH], line: u8) {
+        // Send string to display
+        self.send_byte(line, LCD_CMD);
+
+        for i in 0..WIDTH {
+            self.send_byte(buf[i], LCD_CHR);
+        }
+    }
+
+    fn print_bytestr(&mut self, bytes: &[u8], line: u8) {
+        let mut buf: [u8;WIDTH] = [0;WIDTH];
+        fill_buf(&mut buf, bytes);
+        self.print_buf(buf, line);
+    }
+
+    fn print_string(&mut self, message: & str, line: u8) {
         // Decode and pass
         self.print_bytestr(&decode(message),line);
     }
 
-    fn print_bytestr(&mut self, bytes: &[u8], line: u8) {
-        // Send string to display
+    fn update(&mut self)
+    {
+        self.print_buf(self.buffer[0],LINE_1);
+        self.print_buf(self.buffer[1],LINE_2);
+    }
 
-        self.send_byte(line, LCD_CMD);
 
-        let n = cmp::min(WIDTH,bytes.len());
+    pub fn set_lines(&mut self, line1: &str, line2: &str)
+    {
+        fill_buf(&mut self.buffer[0],&decode(line1));
+        fill_buf(&mut self.buffer[1],&decode(line2));
+        self.update();
+    }
 
-        let mut i=0;
-
-        // write actual string
-        while i<n {
-            let c = bytes[i];
-            self.send_byte(c, LCD_CHR);
-            i+=1;
-        }
-
-        // write padding
-        while i<WIDTH {
-            self.send_byte(' ' as u8, LCD_CHR);
-            i+=1;
-        }
+    pub fn set_backlight(&mut self, state: bool)
+    {
+        self.backlight = state;
+        self.update();
     }
 
     pub fn toggle_backlight(&mut self)
     {
         self.backlight = !self.backlight;
-        if self.backlight {
-            self.send_byte(BACKLIGHT_BIT, LCD_CMD);
-        }
-        else {
-            self.send_byte(0, LCD_CMD);
-        }
-
+        self.update();
     }
 }
-
