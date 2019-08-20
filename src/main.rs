@@ -26,8 +26,6 @@ fn set_pin_dir(pin: & Pin, dir: Direction) -> std::result::Result<(), retry::Err
 
 fn main()
 {
-    let mut conn = mpd::Client::connect("127.0.0.1:6600").expect("Failed connecting to MPD");
-
     let button_a = Pin::new(BUTTON_A);
     button_a.export().expect("Failed exporting button A pin");
     set_pin_dir(&button_a, Direction::In).expect("Failed setting direction of A button");
@@ -69,13 +67,15 @@ fn main()
         lcd.set_lines(&now.format("     %H:%M      ").to_string(),&l2);
 
         if b_val != 0 {
-            match conn.toggle_pause() {
-                Err(e) => {
-                    println!("Failed toggling play state ({})",e);
-                    errcnt += 1;
-                    conn = mpd::Client::connect("127.0.0.1:6600").unwrap()
-                },
-                Ok(v) => v,
+
+            let do_steps = || {
+                let mut conn = mpd::Client::connect("127.0.0.1:6600")?;
+                conn.toggle_pause()
+            };
+
+            if let Err(e) = do_steps() {
+                println!("Failed toggling play state ({})",e);
+                errcnt += 1
             }
         }
 
