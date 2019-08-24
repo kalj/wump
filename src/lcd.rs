@@ -5,6 +5,7 @@ use self::i2cdev::linux::{LinuxI2CDevice};
 use std::time::Duration;
 use std::thread::sleep;
 use std::cmp;
+use std::default::{Default};
 
 // Define some device constants
 pub const WIDTH: usize = 16;    // Maximum characters per line
@@ -208,7 +209,7 @@ impl LcdDev {
 pub struct Lcd
 {
     dev: LcdDev,
-    buffer: [[u8;WIDTH];2]
+    lines: [String;2]
 }
 
 impl Lcd {
@@ -217,7 +218,7 @@ impl Lcd {
         let dev = LcdDev::new(path, addr, true);
         Lcd {
             dev: dev,
-            buffer: [[0x20;WIDTH];2]
+            lines: Default::default()
         }
     }
 
@@ -227,22 +228,27 @@ impl Lcd {
 
     fn update(&mut self)
     {
-        self.dev.print_buf(self.buffer[0],LINE_1);
-        self.dev.print_buf(self.buffer[1],LINE_2);
+        self.dev.print_bytestr(&decode(&self.lines[0]),LINE_1);
+        self.dev.print_bytestr(&decode(&self.lines[1]),LINE_2);
     }
 
 
     pub fn set_lines(&mut self, line1: &str, line2: &str)
     {
-        fill_buf(&mut self.buffer[0],&decode(line1));
-        fill_buf(&mut self.buffer[1],&decode(line2));
-        self.update();
+        if self.lines[0] != line1 || self.lines[1] != line2 {
+            self.lines[0] = line1.to_string();
+            self.lines[1] = line2.to_string();
+            self.update();
+        }
     }
 
-    pub fn set_backlight(&mut self, state: bool)
+    pub fn set_backlight(&mut self, newbl: bool)
     {
-        self.dev.set_backlight(state);
-        self.update();
+        let bl = self.dev.get_backlight();
+        if bl != newbl {
+            self.dev.set_backlight(newbl);
+            self.update();
+        }
     }
 
     pub fn toggle_backlight(&mut self)
