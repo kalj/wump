@@ -47,7 +47,6 @@ fn main()
 
     let lifetime : chrono::Duration = chrono::Duration::seconds(2);
     let mut lastactivity = Local::now();
-    let mut errcnt : u32 = 0;
 
     loop {
         let now : DateTime<Local> = Local::now();
@@ -56,17 +55,17 @@ fn main()
         let a_val = button_a.get_value().expect("failed getting value of button A");
         let b_val = button_b.get_value().expect("failed getting value of button B");
 
-        if a_val != 0 || b_val != 0 {
+        if a_val != 1 || b_val != 1 {
             lastactivity = now;
             lcd.set_backlight(true);
         } else if dur > lifetime {
             lcd.set_backlight(false);
         }
 
-        let l2 = format!("Nerr={}",errcnt);
+        let l2 = "";
         lcd.set_lines(&now.format("     %H:%M      ").to_string(),&l2);
 
-        if b_val != 0 {
+        if b_val != 1 {
 
             let do_steps = || {
                 let mut conn = mpd::Client::connect("127.0.0.1:6600")?;
@@ -75,7 +74,6 @@ fn main()
 
             if let Err(e) = do_steps() {
                 println!("Failed toggling play state ({})",e);
-                errcnt += 1
             }
         }
 
