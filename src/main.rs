@@ -14,10 +14,21 @@ use std::sync::mpsc;
 use sysfs_gpio::{Direction, Pin, Edge};
 use retry::{retry,delay};
 
-const BUTTON_A: u64 = 24;
-const BUTTON_B: u64 = 23;
+// Pin usage of Hifiberry Miniamp:
+// GPIOs 18-21 (pins 12, 35, 38 and 40) are used for the sound
+// interface. GPIO16 can be used to mute the power stage. GPIO26 shuts
+// down the power stage. You can’t use these GPIOs for any other
+// purpose.
 
-const BUTTONS: &[u64] = &[BUTTON_A, BUTTON_B];
+// Pin usage of LCD (i2c)
+// GPIO2 (SDA) & GPIO3 (SCL) (pins 3 & 5)
+
+const BUTTON_A: u64 = 22; // Red
+const BUTTON_B: u64 = 23; // Yellow
+const BUTTON_C: u64 = 24; // Blue
+const BUTTON_D: u64 = 25; // Green
+
+const BUTTONS: &[u64] = &[BUTTON_A, BUTTON_B, BUTTON_C, BUTTON_D];
 
 const I2C_PATH: &str = "/dev/i2c-1";
 const LCD_ADDR: u16 = 0x27;
@@ -72,7 +83,7 @@ fn main()
         })
     }).collect();
 
-    let lifetime : chrono::Duration = chrono::Duration::seconds(2);
+    let lifetime : chrono::Duration = chrono::Duration::seconds(5);
     let mut lastactivity = Local::now();
 
     loop {
