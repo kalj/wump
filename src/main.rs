@@ -57,7 +57,7 @@ fn main()
     lcd.init();
 
     // Send some test
-    lcd.set_lines("Alarm Clock 0.3","Starting up...");
+    lcd.set_lines("Wake-Up MP 0.3","Starting up...");
 
     // 1 second delay
     thread::sleep(Duration::new(1,0));
