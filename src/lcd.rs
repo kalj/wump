@@ -242,6 +242,10 @@ impl Lcd {
         }
     }
 
+    pub fn get_backlight(&self) -> bool {
+        self.dev.get_backlight()
+    }
+
     pub fn set_backlight(&mut self, newbl: bool)
     {
         let bl = self.dev.get_backlight();
