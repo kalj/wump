@@ -10,6 +10,13 @@ pub struct Time {
     min : u8
 }
 
+impl Time {
+    pub fn new(hour: u8, min: u8) -> Time {
+        Time { hour: hour, min: min }
+    }
+}
+
+
 // time to str: "{:02}:{:02}",time.hour,time.min
 
 bitflags! {
@@ -42,31 +49,40 @@ impl DayMask {
     }
 }
 
-enum AlarmMode {
+pub enum AlarmMode {
     OneTime,
     Recurring(DayMask)
 }
 
-struct FadeMode {
-    length_s  : Duration,
-    start_vol : f32,
-    end_vol   : f32
-}
-
 pub struct Alarm {
-    enabled : bool,
-    time    : Time,
-    fading  : FadeMode,
-    mode    : AlarmMode,
+    enabled   : bool,
+    time      : Time,
+    length    : Duration,
+    start_vol : f32,
+    end_vol   : f32,
+    mode      : AlarmMode,
 }
 
 impl Alarm {
-    pub fn new() -> Alarm {
-        Alarm { enabled: true,
-                time : Time { hour: 6, min: 45 },
-                fading : FadeMode {length_s: Duration::seconds(10), start_vol: 0.1, end_vol: 0.7},
-                 //Recurring(DayMask::default())},
-                mode : AlarmMode::OneTime }
+    pub fn new(enabled: bool, time: Time, length_s: i64, start_vol: f32, end_vol: f32, mode: AlarmMode) -> Alarm {
+        Alarm { enabled: enabled,
+                time: time,
+                length: Duration::seconds(length_s),
+                start_vol: start_vol,
+                end_vol: end_vol,
+                mode: mode }
+    }
+
+    pub fn get_length(&self) -> Duration {
+        self.length
+    }
+
+    pub fn get_start_vol(&self) -> f32 {
+        self.start_vol
+    }
+
+    pub fn get_end_vol(&self) -> f32 {
+        self.end_vol
     }
 
     pub fn is_enabled(&self) -> bool {
@@ -92,6 +108,12 @@ impl Alarm {
         match self.mode {
             AlarmMode::OneTime => true,
             AlarmMode::Recurring(mask) => mask.contains_dow(datetime.weekday())
+        }
+    }
+
+    pub fn start(&mut self) {
+        if let AlarmMode::OneTime = self.mode {
+            self.enabled = false;
         }
     }
 }

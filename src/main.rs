@@ -10,6 +10,9 @@ use chrono::{Local, DateTime};
 use lcd::Lcd;
 use buttons::ButtonHandler;
 use alarm::Alarm;
+use alarm::AlarmMode;
+use alarm::DayMask;
+use alarm::Time;
 use std::time::Duration;
 use std::thread;
 
@@ -27,16 +30,36 @@ const BUTTON_A: u64 = 22; // Red
 const BUTTON_B: u64 = 23; // Yellow
 const BUTTON_C: u64 = 24; // Blue
 const BUTTON_D: u64 = 25; // Green
+// const MUTE_PIN: u64 = 16;
+// const POFF_PIN: u64 = 26;
 
 const BUTTONS: &[u64] = &[BUTTON_A, BUTTON_B, BUTTON_C, BUTTON_D];
 
 const I2C_PATH: &str = "/dev/i2c-1";
 const LCD_ADDR: u16 = 0x27;
 
+#[derive(Copy, Clone)]
+struct Fade {
+    start_time: DateTime<Local>,
+    end_time: DateTime<Local>,
+    start_vol: f32,
+    end_vol:f32
+}
+
+impl Fade {
+    fn new(start: DateTime<Local>, alarm: &Alarm) -> Fade
+    {
+        Fade{start_time:start,
+             end_time:start+alarm.get_length(),
+             start_vol:alarm.get_start_vol(),
+             end_vol:alarm.get_end_vol()}
+    }
+}
+
 enum PlaybackState {
-    Play,
-    Pause,
-    Fade(DateTime<Local>)
+    Playing,
+    Paused,
+    Fading(Fade)
 }
 
 struct State {
@@ -46,8 +69,10 @@ struct State {
 
 fn main()
 {
-    let mut state = State { alarm : Alarm::new(),
-                            pb_state : PlaybackState::Pause};
+    let mut state = State { alarm:    Alarm::new(true,
+                                                 Time::new(6,45),
+                                                 10, 0.1, 0.7, AlarmMode::Recurring(DayMask::default())),
+                            pb_state: PlaybackState::Paused};
 
     let mut button_handler = ButtonHandler::new(BUTTONS);
 
@@ -62,98 +87,124 @@ fn main()
     // 1 second delay
     thread::sleep(Duration::new(1,0));
 
-    let lifetime : chrono::Duration = chrono::Duration::seconds(5);
-    let mut lastactivity = Local::now();
+    let backlight_timeout : chrono::Duration = chrono::Duration::seconds(5);
+    let mut last_button_activity = Local::now();
 
     loop {
         let now : DateTime<Local> = Local::now();
         let mut mpd_conn = mpd::Client::connect("127.0.0.1:6600").expect("Failed connecting to mpd");
-        match mpd_conn.status().expect("Failed querying mpd for status").state {
-            mpd::State::Stop => {
-                state.pb_state = PlaybackState::Pause;
-            }
-            mpd::State::Play => {
-                state.pb_state = PlaybackState::Play;
-            }
-            mpd::State::Pause => {
-                state.pb_state = PlaybackState::Pause;
-            }
-        }
+        let mpd_state = mpd_conn.status().expect("Failed querying mpd for status").state;
 
-        let mut start_alarm = false;
-        let mut activity = false;
-        let mut toggle_play = false;
+        // update state based on external mpd state changes
+        state.pb_state = match mpd_state {
+            mpd::State::Stop|mpd::State::Pause => PlaybackState::Paused,
+            mpd::State::Play => match state.pb_state {
+                PlaybackState::Paused => PlaybackState::Playing,
+                PlaybackState::Playing|PlaybackState::Fading(_) => state.pb_state
+            }
+        };
+
+        // gather button events
+        let mut button_toggle_alarm_enabled = false;
+        let mut button_toggle_play = false;
+        let mut button_activity = false;
 
         button_handler.handle_events(|x| {
 
             if x == BUTTON_B {
-                toggle_play = true;
+                button_toggle_play = true;
                 println!("Toggle play button pressed");
             }
             if x == BUTTON_A {
-                state.alarm.toggle_enabled();
+                button_toggle_alarm_enabled = true;
                 println!("Toggle alarm state button pressed, alarm at {:?}",state.alarm.get_time());
 
             }
 
-            activity = true;
+            button_activity = true;
 
             if x == BUTTON_D {
                 println!("Toggle backlight state button pressed");
                 if lcd.get_backlight() {
-                    activity = false;
-                    lastactivity = now-(lifetime+lifetime);
+                    button_activity = false;
+                    last_button_activity = now-(backlight_timeout+backlight_timeout);
                 }
                 // other case handled by activity = true above
             }
         });
 
-        if let PlaybackState::Pause = state.pb_state  {
-            println!("Is not playing...");
-            if state.alarm.should_start(&now) {
-                start_alarm = true;
-                println!("Starting alarm...");
+        // handle button events and alarm state changes
+
+        if button_toggle_alarm_enabled {
+            state.alarm.toggle_enabled();
+        }
+
+        if state.alarm.should_start(&now) {
+            match state.pb_state {
+                PlaybackState::Paused => {
+                    println!("Starting up the alarm!");
+                    state.alarm.start();
+                    state.pb_state=PlaybackState::Fading(Fade::new(now,&state.alarm));
+                }
+                _ => {}
             }
         }
 
+        if button_toggle_play {
+            state.pb_state = match state.pb_state {
+                PlaybackState::Paused => PlaybackState::Playing,
+                PlaybackState::Playing|PlaybackState::Fading(_) => PlaybackState::Paused
+            };
+        }
 
-        if activity {
-            lastactivity = now;
+        // if button=change_volume => { set volume, and if state==fading => state = playing }
+
+        // handle fading, set volume or change
+
+        if let PlaybackState::Fading(fade) = state.pb_state {
+            println!("start_time: {}, end_time: {}, now: {}", fade.start_time, fade.end_time, now);
+            let num = (now-fade.start_time).num_milliseconds() as f32;
+            let den = (fade.end_time - fade.start_time).num_milliseconds() as f32;
+            let a = (num / den).min(1.0).max(0.0);
+
+            let vol_fraction = fade.start_vol + (fade.end_vol-fade.start_vol)*a;
+            let vol_percent = (vol_fraction*100.0).round() as i8;
+
+            println!("Fading. a={}, setting volume to {}",a, vol_percent);
+            mpd_conn.volume(vol_percent).expect("Failed sending set volume command to mpd.");
+            if now >= fade.end_time {
+                println!("Done fading, switching to PlaybackState::Playing");
+                state.pb_state = PlaybackState::Playing;
+            }
+        }
+
+        // handle playback state changes (due to button press or alarm starting)
+        match mpd_state {
+            mpd::State::Stop|mpd::State::Pause => match state.pb_state {
+                PlaybackState::Playing|PlaybackState::Fading(_) => mpd_conn.play().expect("Failed sending play command to mpd."),
+                _ => ()
+            },
+            mpd::State::Play => match state.pb_state {
+                PlaybackState::Paused => mpd_conn.pause(true).expect("Failed sending pause command to mpd."),
+                _ => ()
+            }
+        };
+
+        // handle backlight state toggle
+        if button_activity {
+            last_button_activity = now;
             lcd.set_backlight(true);
         } else {
-            let dur = now.signed_duration_since(lastactivity);
-            if dur > lifetime {
+            let dur = now.signed_duration_since(last_button_activity);
+            if dur > backlight_timeout {
                 lcd.set_backlight(false);
             }
         }
 
-        let l2 = if state.alarm.is_enabled() { "a" } else { "" };
+        let pb_state_char = if let PlaybackState::Paused = state.pb_state { " " } else { ">" };
+        let alarm_state_char = if state.alarm.is_enabled() { "a" } else { " " };
+        let l2 = format!("{}{:>15}",alarm_state_char, pb_state_char);
         lcd.set_lines(&now.format("     %H:%M      ").to_string(),&l2);
-
-        if start_alarm {
-            state.pb_state = PlaybackState::Play;
-            mpd_conn.play().expect("Failed starting playback for alarm");
-        }
-        else if toggle_play {
-            let mut do_steps = || -> mpd::error::Result<_> {
-                match state.pb_state {
-                    PlaybackState::Play => {
-                        mpd_conn.pause(true)?;
-                        state.pb_state = PlaybackState::Pause;
-                    }
-                    PlaybackState::Pause => {
-                        mpd_conn.play()?;
-                        state.pb_state = PlaybackState::Play;
-                    }
-                    PlaybackState::Fade(fade_time) => ()
-                }
-                Ok(())
-            };
-
-            if let Err(e) = do_steps() {
-                println!("Failed toggling play state ({})",e);
-            }
-        }
 
         thread::sleep(Duration::from_millis(250));
     }
