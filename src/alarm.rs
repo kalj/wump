@@ -73,6 +73,27 @@ impl Alarm {
                 mode: mode }
     }
 
+    pub fn to_str(&self) -> String {
+        if self.enabled {
+            match self.mode {
+                AlarmMode::OneTime => {
+                    format!("a:{:02}:{:02}:S",self.time.hour,self.time.min)
+                },
+                AlarmMode::Recurring(dm) => {
+                    if dm==DayMask::from_bits_truncate(0b0001_1111) {
+                        format!("a:{:02}:{:02}:M-F",self.time.hour,self.time.min)
+                    }
+                    else {
+                        format!("a:{:02}:{:02}:R",self.time.hour,self.time.min)
+                    }
+                }
+            }
+        }
+        else {
+            "".to_string()
+        }
+    }
+
     pub fn get_length(&self) -> Duration {
         self.length
     }

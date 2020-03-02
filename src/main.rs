@@ -202,9 +202,10 @@ fn main()
         }
 
         let pb_state_char = if let PlaybackState::Paused = state.pb_state { " " } else { ">" };
-        let alarm_state_char = if state.alarm.is_enabled() { "a" } else { " " };
-        let l2 = format!("{}{:>15}",alarm_state_char, pb_state_char);
-        lcd.set_lines(&now.format("     %H:%M      ").to_string(),&l2);
+        let alarm_str = state.alarm.to_str();
+        let l1 = format!("{:<11}{}",alarm_str,now.format("%H:%M"));
+        let l2 = format!("{:<16}", pb_state_char);
+        lcd.set_lines(&l1,&l2);
 
         thread::sleep(Duration::from_millis(250));
     }
