@@ -66,7 +66,7 @@ impl ButtonHandler {
 
     pub fn handle_events(&mut self, mut callback: impl FnMut(u64) ) {
 
-        for x in &self.rx {
+        for x in self.rx.try_iter() {
             callback(x)
         }
     }
