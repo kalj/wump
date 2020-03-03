@@ -1,11 +1,19 @@
 
-mod lcd;
-mod buttons;
-mod alarm;
+#[macro_use]
+extern crate rouille;
 extern crate chrono;
 extern crate mpd;
 
+use std::time::Duration;
+use std::thread;
+use std::sync::{RwLock,Arc};
+
 use chrono::{Local, DateTime};
+
+mod lcd;
+mod buttons;
+mod alarm;
+mod webui;
 
 use lcd::Lcd;
 use buttons::ButtonHandler;
@@ -13,8 +21,7 @@ use alarm::Alarm;
 use alarm::AlarmMode;
 use alarm::DayMask;
 use alarm::Time;
-use std::time::Duration;
-use std::thread;
+use webui::start_webui;
 
 // Pin usage of Hifiberry Miniamp:
 // GPIOs 18-21 (pins 12, 35, 38 and 40) are used for the sound
@@ -63,18 +70,20 @@ enum PlaybackState {
 }
 
 struct State {
-    alarm : Alarm,
-    pb_state : PlaybackState,
+    alarm: Arc<RwLock<Alarm>>,
+    pb_state: PlaybackState,
 }
 
 fn main()
 {
-    let mut state = State { alarm:    Alarm::new(true,
-                                                 Time::new(6,45),
-                                                 10, 0.1, 0.7, AlarmMode::Recurring(DayMask::default())),
+    let mut state = State { alarm:    Arc::new(RwLock::new(Alarm::new(true, Time::new(6,45),
+                                                                      10, 0.1, 0.7,
+                                                                      AlarmMode::Recurring(DayMask::default())))),
                             pb_state: PlaybackState::Paused};
 
     let mut button_handler = ButtonHandler::new(BUTTONS);
+
+    let webui = start_webui(state.alarm.clone());
 
     let mut lcd = Lcd::new(I2C_PATH, LCD_ADDR);
 
@@ -117,7 +126,7 @@ fn main()
             }
             if x == BUTTON_A {
                 button_toggle_alarm_enabled = true;
-                println!("Toggle alarm state button pressed, alarm at {:?}",state.alarm.get_time());
+                println!("Toggle alarm state button pressed");
 
             }
 
@@ -136,17 +145,20 @@ fn main()
         // handle button events and alarm state changes
 
         if button_toggle_alarm_enabled {
-            state.alarm.toggle_enabled();
+            state.alarm.write().unwrap().toggle_enabled();
         }
 
-        if state.alarm.should_start(&now) {
-            match state.pb_state {
-                PlaybackState::Paused => {
-                    println!("Starting up the alarm!");
-                    state.alarm.start();
-                    state.pb_state=PlaybackState::Fading(Fade::new(now,&state.alarm));
+        {
+            let mut alarm = state.alarm.write().unwrap();
+            if alarm.should_start(&now) {
+                match state.pb_state {
+                    PlaybackState::Paused => {
+                        println!("Starting up the alarm!");
+                        alarm.start();
+                        state.pb_state=PlaybackState::Fading(Fade::new(now,&alarm));
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
         }
 
@@ -202,7 +214,7 @@ fn main()
         }
 
         let pb_state_char = if let PlaybackState::Paused = state.pb_state { " " } else { ">" };
-        let alarm_str = state.alarm.to_str();
+        let alarm_str = state.alarm.read().unwrap().to_str();
         let l1 = format!("{:<11}{}", pb_state_char, now.format("%H:%M"));
         let l2 = format!("{:<16}", alarm_str);
         lcd.set_lines(&l1,&l2);

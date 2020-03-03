@@ -14,10 +14,18 @@ impl Time {
     pub fn new(hour: u8, min: u8) -> Time {
         Time { hour: hour, min: min }
     }
+    pub fn from_str(s: &str) -> Time {
+        let mut time_iter = s.split(":");
+        let hour = time_iter.next().unwrap().parse::<u8>().unwrap();
+        let min  = time_iter.next().unwrap().parse::<u8>().unwrap();
+        Time {hour: hour, min: min }
+    }
+    pub fn to_str(&self) -> String {
+        format!("{:02}:{:02}",self.hour,self.min)
+    }
 }
 
 
-// time to str: "{:02}:{:02}",time.hour,time.min
 
 bitflags! {
     pub struct DayMask: u8 {
@@ -49,11 +57,13 @@ impl DayMask {
     }
 }
 
+#[derive(Copy, Clone)]
 pub enum AlarmMode {
     OneTime,
     Recurring(DayMask)
 }
 
+#[derive(Copy, Clone)]
 pub struct Alarm {
     enabled   : bool,
     time      : Time,
@@ -77,14 +87,14 @@ impl Alarm {
         if self.enabled {
             match self.mode {
                 AlarmMode::OneTime => {
-                    format!("a:{:02}:{:02}:S",self.time.hour,self.time.min)
+                    format!("a:{}:S",self.time.to_str())
                 },
                 AlarmMode::Recurring(dm) => {
                     if dm==DayMask::from_bits_truncate(0b0001_1111) {
-                        format!("a:{:02}:{:02}:M-F",self.time.hour,self.time.min)
+                        format!("a:{}:M-F",self.time.to_str())
                     }
                     else {
-                        format!("a:{:02}:{:02}:R",self.time.hour,self.time.min)
+                        format!("a:{}:R",self.time.to_str())
                     }
                 }
             }
@@ -106,6 +116,10 @@ impl Alarm {
         self.end_vol
     }
 
+    pub fn get_mode(&self) -> AlarmMode {
+        self.mode
+    }
+
     pub fn is_enabled(&self) -> bool {
          self.enabled
     }
@@ -121,8 +135,8 @@ impl Alarm {
     pub fn should_start(&self, datetime: &DateTime<Local>) -> bool {
         if !self.enabled ||
             datetime.second() != 0 ||
-            datetime.hour() != self.time.hour.into() ||
-            datetime.minute() != self.time.min.into() {
+            datetime.hour() != self.time.hour as u32 ||
+            datetime.minute() != self.time.min as u32 {
             return false;
         }
 
