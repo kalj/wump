@@ -203,8 +203,8 @@ fn main()
 
         let pb_state_char = if let PlaybackState::Paused = state.pb_state { " " } else { ">" };
         let alarm_str = state.alarm.to_str();
-        let l1 = format!("{:<11}{}",alarm_str,now.format("%H:%M"));
-        let l2 = format!("{:<16}", pb_state_char);
+        let l1 = format!("{:<11}{}", pb_state_char, now.format("%H:%M"));
+        let l2 = format!("{:<16}", alarm_str);
         lcd.set_lines(&l1,&l2);
 
         thread::sleep(Duration::from_millis(250));
