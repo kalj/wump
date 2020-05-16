@@ -33,14 +33,14 @@ use webui::start_webui;
 // GPIO2 (SDA) & GPIO3 (SCL) (pins 3 & 5)
 
 // Button pins
-const BUTTON_A: u64 = 22; // Red
-const BUTTON_B: u64 = 27; // Green
-const BUTTON_D: u64 = 17; // Yellow
+const BUTTON_A: u8 = 22; // Red
+const BUTTON_B: u8 = 27; // Green
+const BUTTON_D: u8 = 17; // Yellow
 
-// const MUTE_PIN: u64 = 16;
-// const POFF_PIN: u64 = 26;
+// const MUTE_PIN: u8 = 16;
+// const POFF_PIN: u8 = 26;
 
-const BUTTONS: &[u64] = &[BUTTON_A, BUTTON_B, BUTTON_D];
+const BUTTONS: &[u8] = &[BUTTON_A, BUTTON_B, BUTTON_D];
 
 const I2C_PATH: &str = "/dev/i2c-1";
 const LCD_ADDR: u16 = 0x27;

@@ -4,8 +4,7 @@ version = "0.1.0"
 
 
 [dependencies]
-sysfs_gpio = "0.5"
-retry      = "0.5.1"
+rppal      = "*"
 i2cdev     = "0.4.2"
 chrono     = "0.4"
 mpd        = "*"
