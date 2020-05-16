@@ -10,12 +10,12 @@ use std::sync::{RwLock,Arc};
 
 use chrono::{Local, DateTime};
 
-mod lcd;
+mod oled;
 mod buttons;
 mod alarm;
 mod webui;
 
-use lcd::Lcd;
+use oled::Oled;
 use buttons::ButtonHandler;
 use alarm::Alarm;
 use alarm::AlarmMode;
@@ -29,9 +29,6 @@ use webui::start_webui;
 // down the power stage. You can’t use these GPIOs for any other
 // purpose.
 
-// Pin usage of LCD (i2c)
-// GPIO2 (SDA) & GPIO3 (SCL) (pins 3 & 5)
-
 // Button pins
 const BUTTON_A: u8 = 22; // Red
 const BUTTON_B: u8 = 27; // Green
@@ -42,8 +39,10 @@ const BUTTON_D: u8 = 17; // Yellow
 
 const BUTTONS: &[u8] = &[BUTTON_A, BUTTON_B, BUTTON_D];
 
-const I2C_PATH: &str = "/dev/i2c-1";
-const LCD_ADDR: u16 = 0x27;
+const OLED_DC_PIN_ID: u8  = 24;
+const OLED_RST_PIN_ID: u8 = 23;
+const OLED_SPI_BUS: rppal::spi::Bus        = rppal::spi::Bus::Spi0;
+const OLED_SPI_SS: rppal::spi::SlaveSelect = rppal::spi::SlaveSelect::Ss1;
 
 #[derive(Copy, Clone)]
 struct Fade {
@@ -85,13 +84,12 @@ fn main()
 
     let webui = start_webui(state.alarm.clone());
 
-    let mut lcd = Lcd::new(I2C_PATH, LCD_ADDR);
+    let mut oled = Oled::new(OLED_DC_PIN_ID, OLED_RST_PIN_ID, OLED_SPI_BUS, OLED_SPI_SS);
 
     // Initialise display
-    lcd.init();
+    oled.init();
 
     // Send some test
-    lcd.set_lines("Wake-Up MP 0.3","Starting up...");
 
     // 1 second delay
     thread::sleep(Duration::new(1,0));
@@ -134,10 +132,10 @@ fn main()
 
             if x == BUTTON_D {
                 println!("Toggle backlight state button pressed");
-                if lcd.get_backlight() {
-                    button_activity = false;
-                    last_button_activity = now-(backlight_timeout+backlight_timeout);
-                }
+                // if lcd.get_backlight() {
+                //     button_activity = false;
+                //     last_button_activity = now-(backlight_timeout+backlight_timeout);
+                // }
                 // other case handled by activity = true above
             }
         });
@@ -205,11 +203,11 @@ fn main()
         // handle backlight state toggle
         if button_activity {
             last_button_activity = now;
-            lcd.set_backlight(true);
+            // lcd.set_backlight(true);
         } else {
             let dur = now.signed_duration_since(last_button_activity);
             if dur > backlight_timeout {
-                lcd.set_backlight(false);
+                // lcd.set_backlight(false);
             }
         }
 
@@ -217,7 +215,7 @@ fn main()
         let alarm_str = state.alarm.read().unwrap().to_str();
         let l1 = format!("{:<11}{}", pb_state_char, now.format("%H:%M"));
         let l2 = format!("{:<16}", alarm_str);
-        lcd.set_lines(&l1,&l2);
+        oled.show_time(&now);
 
         thread::sleep(Duration::from_millis(250));
     }

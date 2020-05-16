@@ -2,10 +2,9 @@
 name = "wump"
 version = "0.1.0"
 
-
 [dependencies]
-rppal      = "*"
-i2cdev     = "0.4.2"
+rppal = { version = "*", features = ["hal"] }
+ssd1322 = "*"
 chrono     = "0.4"
 mpd        = "*"
 bitflags   = "*"
@@ -13,3 +12,6 @@ rouille    = "*"
 tinytemplate = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "*"
+
+[patch.crates-io]
+ssd1322 = { path = 'ssd1322' }
