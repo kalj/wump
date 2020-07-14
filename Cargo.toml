@@ -12,6 +12,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "*"
 rppal = { version = "*", features = ["hal"] }
 ssd1322 = "*"
+rusttype   = "*"
 
 [patch.crates-io]
 ssd1322 = { path = 'ssd1322' }

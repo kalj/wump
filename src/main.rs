@@ -10,6 +10,7 @@ use std::sync::{RwLock,Arc};
 
 use chrono::{Local, DateTime};
 
+mod fontmap;
 mod oled;
 mod buttons;
 mod alarm;
