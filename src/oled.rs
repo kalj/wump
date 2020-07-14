@@ -77,7 +77,7 @@ impl Iterator for TextCanvasIterator<'_> {
 }
 
 impl TextCanvas {
-    fn new(font_data: &[u8], upper_left: [u32; 2], lower_right: [u32; 2]) -> TextCanvas {
+    fn new(font_data: &[u8], charset_opt: Option<&HashSet<char>>, upper_left: [u32; 2], lower_right: [u32; 2]) -> TextCanvas {
 
         if upper_left[0] >= lower_right[0] || upper_left[1] >= lower_right[1] {
             panic!("`upper_left` must be strictly to the left and above `lower_right`");
@@ -85,8 +85,13 @@ impl TextCanvas {
 
         let font_size = lower_right[1]-upper_left[1];
 
-        let chars: HashSet<_> = "0123456789:".chars().collect();
-        let bmpset = FontBitmapSet::new_with_charset(font_data, font_size, &chars);
+        let bmpset =
+            if let Some(charset) = charset_opt {
+                FontBitmapSet::new_with_charset(font_data, font_size, charset)
+            } else {
+                FontBitmapSet::new(font_data, font_size)
+            };
+
         TextCanvas { bmpset, upper_left, lower_right }
     }
 
@@ -114,7 +119,9 @@ pub struct Oled
 {
     rst_pin: OutputPin,
     dpy: Display,
-    clock_canvas: TextCanvas
+    clock_canvas: TextCanvas,
+    top_canvas: TextCanvas,
+    bottom_canvas: TextCanvas,
 }
 
 impl Oled {
@@ -135,11 +142,12 @@ impl Oled {
 
         let font_data = include_bytes!("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf");
 
-        let upper_left = [0, 0];
-        let lower_right = [256, 64];
-        let clock_canvas = TextCanvas::new(font_data, upper_left, lower_right);
+        let time_chars: HashSet<_> = "0123456789:".chars().collect();
+        let clock_canvas = TextCanvas::new(font_data, Some(&time_chars), [0, 16], [256, 48]);
+        let top_canvas = TextCanvas::new(font_data, None, [0, 0], [256, 16]);
+        let bottom_canvas = TextCanvas::new(font_data, None, [0, 48], [256, 64]);
 
-        Oled { rst_pin, dpy, clock_canvas }
+        Oled { rst_pin, dpy, clock_canvas, top_canvas, bottom_canvas }
     }
 
     pub fn init(&mut self) {
@@ -174,6 +182,14 @@ impl Oled {
             region.draw(iter::repeat(0)).unwrap();
         }
 
+    }
+
+    pub fn set_top_line(&mut self, line: &str) {
+        self.top_canvas.render_text(&mut self.dpy, line);
+    }
+
+    pub fn set_bottom_line(&mut self, line: &str) {
+        self.bottom_canvas.render_text(&mut self.dpy, line);
     }
 
     pub fn show_time(&mut self, now: &DateTime<Local>)

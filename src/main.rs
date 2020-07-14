@@ -91,6 +91,8 @@ fn main()
     oled.init();
 
     // Send some test
+    oled.set_top_line("Wake-Up MP 0.4");
+    oled.set_bottom_line("Starting up...");
 
     // 1 second delay
     thread::sleep(Duration::new(1,0));
@@ -212,11 +214,13 @@ fn main()
             }
         }
 
-        let pb_state_char = if let PlaybackState::Paused = state.pb_state { " " } else { ">" };
+        let l1 = if let PlaybackState::Paused = state.pb_state { "Paused" } else { "Playing" };
         let alarm_str = state.alarm.read().unwrap().to_str();
-        let l1 = format!("{:<11}{}", pb_state_char, now.format("%H:%M"));
-        let l2 = format!("{:<16}", alarm_str);
+        let l2 = format!("Alarm: {}", alarm_str);
+
         oled.show_time(&now);
+        oled.set_top_line(l1);
+        oled.set_bottom_line(&l2);
 
         thread::sleep(Duration::from_millis(250));
     }

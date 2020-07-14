@@ -36,10 +36,10 @@ impl FontBitmapSet {
         let mut glyph_height: u32 = 0;
         let mut _actual_font_size: u32 = 0;
 
-        let mut i = 0;
+        let mut i: i32 = -1;
         loop {
 
-            let scale = Scale::uniform((font_size+i) as f32);
+            let scale = Scale::uniform((font_size as i32 + i) as f32);
 
             let v_metrics = font.v_metrics(scale);
             let offset = point(0.0, v_metrics.ascent);
@@ -69,7 +69,7 @@ impl FontBitmapSet {
             if trial_glyph_height > font_size {
                 break;
             } else {
-                _actual_font_size = font_size + i;
+                _actual_font_size = (font_size as i32 + i) as u32;
                 glyphs = trial_glyphs;
                 glyph_hoffset = trial_glyph_hoffset;
                 glyph_voffset = trial_glyph_voffset;
@@ -114,6 +114,10 @@ impl FontBitmapSet {
     }
 
     pub fn get(&self, c: char, row: u32, col: u32) -> u8 {
-        self.bitmaps[&c][(row*self.width + col) as usize]
+        if let Some(bmp) = self.bitmaps.get(&c) {
+            bmp[(row*self.width + col) as usize]
+        } else {
+            panic!("No bitmap found for character {} with code {}", c, c as u8);
+        }
     }
 }
