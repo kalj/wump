@@ -12,12 +12,12 @@ use chrono::{Local, DateTime};
 
 mod fontmap;
 mod oled;
-mod buttons;
+mod input;
 mod alarm;
 mod webui;
 
 use oled::Oled;
-use buttons::ButtonHandler;
+use input::InputHandler;
 use alarm::Alarm;
 use alarm::AlarmMode;
 use alarm::DayMask;
@@ -31,14 +31,19 @@ use webui::start_webui;
 // purpose.
 
 // Button pins
-const BUTTON_A: u8 = 22; // Red
-const BUTTON_B: u8 = 27; // Green
-const BUTTON_D: u8 = 17; // Yellow
+const BUTTON_A: u8   = 22; // Red
+const BUTTON_B: u8   = 27; // Green
+const BUTTON_C: u8   = 17; // Yellow
+const BUTTON_ROT: u8 = 4;  // Rotary encoder
 
 // const MUTE_PIN: u8 = 16;
 // const POFF_PIN: u8 = 26;
 
-const BUTTONS: &[u8] = &[BUTTON_A, BUTTON_B, BUTTON_D];
+const BUTTONS: &[u8] = &[BUTTON_A, BUTTON_B, BUTTON_C, BUTTON_ROT];
+
+// Rotary encoder
+const ROTENC_A: u8 = 15;
+const ROTENC_B: u8 = 14;
 
 const OLED_DC_PIN_ID: u8  = 24;
 const OLED_RST_PIN_ID: u8 = 23;
@@ -129,6 +134,9 @@ fn main()
                 button_toggle_alarm_enabled = true;
                 println!("Toggle alarm state button pressed");
 
+            }
+            if x == BUTTON_ROT {
+                println!("Rotary encoder button pressed");
             }
 
             button_activity = true;
