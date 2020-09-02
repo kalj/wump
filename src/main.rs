@@ -97,7 +97,7 @@ fn main()
     // 1 second delay
     thread::sleep(Duration::new(1,0));
 
-    let backlight_timeout : chrono::Duration = chrono::Duration::seconds(5);
+    let dim_timeout : chrono::Duration = chrono::Duration::seconds(5);
     let mut last_button_activity = Local::now();
 
     loop {
@@ -133,12 +133,12 @@ fn main()
 
             button_activity = true;
 
-            if x == BUTTON_D {
-                println!("Toggle backlight state button pressed");
-                // if lcd.get_backlight() {
-                //     button_activity = false;
-                //     last_button_activity = now-(backlight_timeout+backlight_timeout);
-                // }
+            if x == BUTTON_C {
+                println!("Toggle dimmed state button pressed");
+                if !oled.get_dimmed() {
+                    button_activity = false;
+                    last_button_activity = now-(dim_timeout+dim_timeout);
+                }
                 // other case handled by activity = true above
             }
         });
@@ -203,14 +203,14 @@ fn main()
             }
         };
 
-        // handle backlight state toggle
+        // handle dimmed state toggle
         if button_activity {
             last_button_activity = now;
-            // lcd.set_backlight(true);
+            oled.set_dimmed(false);
         } else {
             let dur = now.signed_duration_since(last_button_activity);
-            if dur > backlight_timeout {
-                // lcd.set_backlight(false);
+            if dur > dim_timeout {
+                oled.set_dimmed(true);
             }
         }
 
@@ -219,7 +219,7 @@ fn main()
         let l2 = format!("Alarm: {}", alarm_str);
 
         oled.show_time(&now);
-        oled.set_top_line(l1);
+        oled.set_top_line(&l1);
         oled.set_bottom_line(&l2);
 
         thread::sleep(Duration::from_millis(250));

@@ -122,6 +122,7 @@ pub struct Oled
     clock_canvas: TextCanvas,
     top_canvas: TextCanvas,
     bottom_canvas: TextCanvas,
+    dimmed: bool
 }
 
 impl Oled {
@@ -147,7 +148,9 @@ impl Oled {
         let top_canvas = TextCanvas::new(font_data, None, [0, 0], [256, 16]);
         let bottom_canvas = TextCanvas::new(font_data, None, [0, 48], [256, 64]);
 
-        Oled { rst_pin, dpy, clock_canvas, top_canvas, bottom_canvas }
+        let dimmed = false;
+
+        Oled { rst_pin, dpy, clock_canvas, top_canvas, bottom_canvas, dimmed }
     }
 
     pub fn init(&mut self) {
@@ -181,7 +184,24 @@ impl Oled {
                 .unwrap();
             region.draw(iter::repeat(0)).unwrap();
         }
+        //                          1   2   3   4   5   6   7   8   9  10  11  12  13   14   15
+        self.dpy.gray_scale_table(&[0, 13, 26, 39, 51, 64, 77, 90, 103, 116, 129, 141, 154, 167, 180]);
+        // self.dpy.gray_scale_table(&[0,  8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112]);
+    }
 
+    pub fn get_dimmed(&mut self) -> bool {
+        self.dimmed
+    }
+
+    pub fn set_dimmed(&mut self, dimmed: bool) {
+
+        if dimmed && !self.dimmed {
+            self.dpy.contrast(0);
+        } else if !dimmed && self.dimmed {
+            self.dpy.contrast(15);
+        }
+
+        self.dimmed = dimmed;
     }
 
     pub fn set_top_line(&mut self, line: &str) {
