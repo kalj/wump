@@ -17,7 +17,7 @@ mod alarm;
 mod webui;
 
 use oled::Oled;
-use input::InputHandler;
+use input::{InputHandler,InputEvent};
 use alarm::Alarm;
 use alarm::AlarmMode;
 use alarm::DayMask;
@@ -86,7 +86,7 @@ fn main()
                                                                       AlarmMode::Recurring(DayMask::default())))),
                             pb_state: PlaybackState::Paused};
 
-    let mut button_handler = ButtonHandler::new(BUTTONS);
+    let mut input_handler = InputHandler::new(BUTTONS, (ROTENC_A, ROTENC_B));
 
     let webui = start_webui(state.alarm.clone());
 
@@ -103,15 +103,16 @@ fn main()
     thread::sleep(Duration::new(1,0));
 
     let dim_timeout : chrono::Duration = chrono::Duration::seconds(5);
-    let mut last_button_activity = Local::now();
+    let mut last_input_activity = Local::now();
 
     loop {
         let now : DateTime<Local> = Local::now();
         let mut mpd_conn = mpd::Client::connect("127.0.0.1:6600").expect("Failed connecting to mpd");
-        let mpd_state = mpd_conn.status().expect("Failed querying mpd for status").state;
+        let mpd_status = mpd_conn.status().expect("Failed querying mpd for status");
+        let mut volume = mpd_status.volume;
 
         // update state based on external mpd state changes
-        state.pb_state = match mpd_state {
+        state.pb_state = match mpd_status.state {
             mpd::State::Stop|mpd::State::Pause => PlaybackState::Paused,
             mpd::State::Play => match state.pb_state {
                 PlaybackState::Paused => PlaybackState::Playing,
@@ -119,41 +120,52 @@ fn main()
             }
         };
 
-        // gather button events
-        let mut button_toggle_alarm_enabled = false;
-        let mut button_toggle_play = false;
-        let mut button_activity = false;
+        // gather input events
+        let mut input_toggle_alarm_enabled = false;
+        let mut input_toggle_play = false;
+        let mut input_activity = false;
+        let mut vol_change: i8 = 0;
 
-        button_handler.handle_events(|x| {
+        input_handler.handle_events(|x| {
 
-            if x == BUTTON_B {
-                button_toggle_play = true;
-                println!("Toggle play button pressed");
-            }
-            if x == BUTTON_A {
-                button_toggle_alarm_enabled = true;
+            if let InputEvent::Button(BUTTON_A) = x {
+                input_toggle_alarm_enabled = true;
                 println!("Toggle alarm state button pressed");
 
             }
-            if x == BUTTON_ROT {
+            if let InputEvent::Button(BUTTON_B) = x {
+                input_toggle_play = true;
+                println!("Toggle play button pressed");
+            }
+
+            if let InputEvent::Button(BUTTON_ROT) = x {
                 println!("Rotary encoder button pressed");
             }
 
-            button_activity = true;
+            if let InputEvent::RotaryEncoder(inc) = x {
+                if inc > 0 {
+                    println!("Rotary encoder turned clockwise");
+                } else if inc < 0 {
+                    println!("Rotary encoder turned counter-clockwise");
+                }
+                vol_change += inc;
+            }
 
-            if x == BUTTON_C {
+            input_activity = true;
+
+            if let InputEvent::Button(BUTTON_C) = x {
                 println!("Toggle dimmed state button pressed");
                 if !oled.get_dimmed() {
-                    button_activity = false;
-                    last_button_activity = now-(dim_timeout+dim_timeout);
+                    input_activity = false;
+                    last_input_activity = now-(dim_timeout+dim_timeout);
                 }
                 // other case handled by activity = true above
             }
         });
 
-        // handle button events and alarm state changes
+        // handle input events and alarm state changes
 
-        if button_toggle_alarm_enabled {
+        if input_toggle_alarm_enabled {
             state.alarm.write().unwrap().toggle_enabled();
         }
 
@@ -171,14 +183,25 @@ fn main()
             }
         }
 
-        if button_toggle_play {
+        if input_toggle_play {
             state.pb_state = match state.pb_state {
                 PlaybackState::Paused => PlaybackState::Playing,
                 PlaybackState::Playing|PlaybackState::Fading(_) => PlaybackState::Paused
             };
         }
 
-        // if button=change_volume => { set volume, and if state==fading => state = playing }
+        // if input=change_volume => { set volume, and if state==fading => state = playing }
+        // volume change
+
+        if vol_change != 0 {
+            if let PlaybackState::Fading(_) = state.pb_state {
+                state.pb_state = PlaybackState::Playing;
+            }
+            volume = (5*vol_change +volume).min(100).max(0);
+
+            mpd_conn.volume(volume);
+
+        }
 
         // handle fading, set volume or change
 
@@ -200,7 +223,7 @@ fn main()
         }
 
         // handle playback state changes (due to button press or alarm starting)
-        match mpd_state {
+        match mpd_status.state {
             mpd::State::Stop|mpd::State::Pause => match state.pb_state {
                 PlaybackState::Playing|PlaybackState::Fading(_) => mpd_conn.play().expect("Failed sending play command to mpd."),
                 _ => ()
@@ -212,17 +235,18 @@ fn main()
         };
 
         // handle dimmed state toggle
-        if button_activity {
-            last_button_activity = now;
+        if input_activity {
+            last_input_activity = now;
             oled.set_dimmed(false);
         } else {
-            let dur = now.signed_duration_since(last_button_activity);
+            let dur = now.signed_duration_since(last_input_activity);
             if dur > dim_timeout {
                 oled.set_dimmed(true);
             }
         }
 
-        let l1 = if let PlaybackState::Paused = state.pb_state { "Paused" } else { "Playing" };
+        let pbstring = if let PlaybackState::Paused = state.pb_state { "Paused" } else { "Playing" };
+        let l1 = format!("Vol: {}    {}", volume, pbstring);
         let alarm_str = state.alarm.read().unwrap().to_str();
         let l2 = format!("Alarm: {}", alarm_str);
 

@@ -1,15 +1,23 @@
 extern crate rppal;
 
-use self::rppal::gpio::{Gpio, Trigger, InputPin};
+use self::rppal::gpio::{Gpio, Trigger, InputPin, Level};
 use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
-pub struct ButtonHandler {
-    rx: mpsc::Receiver<u8>,
-    button_pins: Vec<InputPin>
+pub enum InputEvent {
+    Button(u8),
+    RotaryEncoder(i8),
 }
 
-impl ButtonHandler {
-    pub fn new(buttons: &[u8]) -> ButtonHandler
+pub struct InputHandler {
+    rx: mpsc::Receiver<InputEvent>,
+    button_pins: Vec<InputPin>,
+    rotary_encoder_thread: thread::JoinHandle<()>,
+}
+
+impl InputHandler {
+    pub fn new(button_pin_ids: &[u8], rotary_encoder_pin_ids: (u8, u8)) -> InputHandler
     {
         let (tx, rx) = mpsc::channel();
         // let mut mute_state : bool = false;
@@ -24,21 +32,47 @@ impl ButtonHandler {
 
         let gpio = Gpio::new().unwrap();
         let button_pins: Vec<InputPin> =
-            buttons.iter().map(|&b| {
+            button_pin_ids.iter().map(|&b| {
 
                 let mut button_pin = gpio.get(b).expect("Failed setting button gpio pin to input").into_input();
                 let tx_b = tx.clone();
                 button_pin.set_async_interrupt(Trigger::RisingEdge,
                                                move |_| {
-                                                   tx_b.send(b);
+                                                   tx_b.send(InputEvent::Button(b));
                                                });
                 button_pin
             }).collect();
 
-        ButtonHandler { rx, button_pins }
+        let rotary_encoder_thread = thread::spawn(move || {
+
+            let tx_rotenc = tx.clone();
+            let mut rotenc_a_pin = gpio.get(rotary_encoder_pin_ids.0).expect("Failed setting rotary encoder a gpio pin to input").into_input();
+            let mut rotenc_b_pin = gpio.get(rotary_encoder_pin_ids.1).expect("Failed setting rotary encoder b gpio pin to input").into_input();
+
+            let mut last_clk_state = Level::High;
+
+            loop {
+                let aval = rotenc_a_pin.read();
+                match aval {
+                    Level::High => if last_clk_state == Level::Low {
+                        if let Level::Low = rotenc_b_pin.read() {
+                            tx_rotenc.send(InputEvent::RotaryEncoder(1)).unwrap();
+                        } else {
+                            tx_rotenc.send(InputEvent::RotaryEncoder(-1)).unwrap();
+                        }
+                    },
+                    _  => {}
+                }
+                last_clk_state = aval;
+
+                thread::sleep(Duration::from_millis(1));
+            }
+        });
+
+        InputHandler { rx, button_pins, rotary_encoder_thread }
     }
 
-    pub fn handle_events(&mut self, mut callback: impl FnMut(u8) ) {
+    pub fn handle_events(&mut self, mut callback: impl FnMut(InputEvent) ) {
 
         for x in self.rx.try_iter() {
             callback(x)
