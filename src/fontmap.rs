@@ -5,7 +5,7 @@ use std::cmp::{min,max};
 use self::rusttype::{point, Font, Scale, PositionedGlyph};
 
 pub struct FontBitmapSet {
-    bitmaps: HashMap<char, Vec<u8>>,
+    bitmaps: HashMap<char, Vec<bool>>,
     width: u32,
     height: u32
 }
@@ -79,12 +79,12 @@ impl FontBitmapSet {
             }
         }
 
-        let mut bitmaps: HashMap<char, Vec<u8>> = HashMap::new();
+        let mut bitmaps: HashMap<char, Vec<bool>> = HashMap::new();
 
         for (ucode, glyph) in glyphs {
 
             let c = char::from(ucode);
-            let mut bitmap = vec![0u8; (glyph_width*(glyph_height)) as usize];
+            let mut bitmap = vec![false; (glyph_width*(glyph_height)) as usize];
 
             if let Some(bb) = glyph.pixel_bounding_box() {
 
@@ -96,7 +96,8 @@ impl FontBitmapSet {
                         panic!("Writing pixel data at ({}, {}) which is outside of bitmap with size ({}, {}). x: {}, y: {}, bb: {:?}", row, col, glyph_height, glyph_width, x, y, bb);
                     }
 
-                    bitmap[((col as u32) + (row as u32*glyph_width)) as usize] = (15.0*v) as u8;
+                    // bitmap[((col as u32) + (row as u32*glyph_width)) as usize] = v > 0.0;
+                    bitmap[((col as u32) + (row as u32*glyph_width)) as usize] = v > 0.2;
                 });
             }
             bitmaps.insert(c, bitmap );
@@ -113,7 +114,7 @@ impl FontBitmapSet {
         self.width
     }
 
-    pub fn get(&self, c: char, row: u32, col: u32) -> u8 {
+    pub fn get(&self, c: char, row: u32, col: u32) -> bool {
         if let Some(bmp) = self.bitmaps.get(&c) {
             bmp[(row*self.width + col) as usize]
         } else {

@@ -11,12 +11,12 @@ use std::sync::{RwLock,Arc};
 use chrono::{Local, DateTime};
 
 mod fontmap;
-mod oled;
+mod display;
 mod input;
 mod alarm;
 mod webui;
 
-use oled::Oled;
+use display::Display;
 use input::{InputHandler,InputEvent};
 use alarm::Alarm;
 use alarm::AlarmMode;
@@ -90,14 +90,12 @@ fn main()
 
     let webui = start_webui(state.alarm.clone());
 
-    let mut oled = Oled::new(OLED_DC_PIN_ID, OLED_RST_PIN_ID, OLED_SPI_BUS, OLED_SPI_SS);
-
-    // Initialise display
-    oled.init();
+    // Create and initialize display
+    let mut dpy = Display::new().unwrap();
 
     // Send some test
-    oled.set_top_line("Wake-Up MP 0.4");
-    oled.set_bottom_line("Starting up...");
+    dpy.set_top_line("Wake-Up MP 0.4").unwrap();
+    dpy.set_bottom_line("Starting up...").unwrap();
 
     // 1 second delay
     thread::sleep(Duration::new(1,0));
@@ -154,8 +152,8 @@ fn main()
             input_activity = true;
 
             if let InputEvent::Button(BUTTON_C) = x {
-                println!("Toggle dimmed state button pressed");
-                if !oled.get_dimmed() {
+                println!("Toggle backlight button pressed");
+                if dpy.get_backlight() {
                     input_activity = false;
                     last_input_activity = now-(dim_timeout+dim_timeout);
                 }
@@ -199,7 +197,7 @@ fn main()
             }
             volume = (5*vol_change +volume).min(100).max(0);
 
-            mpd_conn.volume(volume);
+            mpd_conn.volume(volume).unwrap();
 
         }
 
@@ -234,14 +232,14 @@ fn main()
             }
         };
 
-        // handle dimmed state toggle
+        // handle backlight toggle
         if input_activity {
             last_input_activity = now;
-            oled.set_dimmed(false);
+            dpy.set_backlight(true).unwrap();
         } else {
             let dur = now.signed_duration_since(last_input_activity);
             if dur > dim_timeout {
-                oled.set_dimmed(true);
+                dpy.set_backlight(false).unwrap();
             }
         }
 
@@ -250,9 +248,9 @@ fn main()
         let alarm_str = state.alarm.read().unwrap().to_str();
         let l2 = format!("Alarm: {}", alarm_str);
 
-        oled.show_time(&now);
-        oled.set_top_line(&l1);
-        oled.set_bottom_line(&l2);
+        dpy.show_time(&now).unwrap();
+        dpy.set_top_line(&l1).unwrap();
+        dpy.set_bottom_line(&l2).unwrap();
 
         thread::sleep(Duration::from_millis(250));
     }
