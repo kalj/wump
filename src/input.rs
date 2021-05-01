@@ -12,8 +12,8 @@ pub enum InputEvent {
 
 pub struct InputHandler {
     rx: mpsc::Receiver<InputEvent>,
-    button_pins: Vec<InputPin>,
-    rotary_encoder_thread: thread::JoinHandle<()>,
+    _button_pins: Vec<InputPin>,
+    _rotary_encoder_thread: thread::JoinHandle<()>,
 }
 
 impl InputHandler {
@@ -31,23 +31,23 @@ impl InputHandler {
         // set_pin_dir(&poff_pin, Direction::High).expect("Failed setting direction of power off pin");
 
         let gpio = Gpio::new().unwrap();
-        let button_pins: Vec<InputPin> =
+        let _button_pins: Vec<InputPin> =
             button_pin_ids.iter().map(|&b| {
 
                 let mut button_pin = gpio.get(b).expect("Failed setting button gpio pin to input").into_input();
                 let tx_b = tx.clone();
                 button_pin.set_async_interrupt(Trigger::RisingEdge,
                                                move |_| {
-                                                   tx_b.send(InputEvent::Button(b));
-                                               });
+                                                   tx_b.send(InputEvent::Button(b)).unwrap();
+                                               }).unwrap();
                 button_pin
             }).collect();
 
-        let rotary_encoder_thread = thread::spawn(move || {
+        let _rotary_encoder_thread = thread::spawn(move || {
 
             let tx_rotenc = tx.clone();
-            let mut rotenc_a_pin = gpio.get(rotary_encoder_pin_ids.0).expect("Failed setting rotary encoder a gpio pin to input").into_input();
-            let mut rotenc_b_pin = gpio.get(rotary_encoder_pin_ids.1).expect("Failed setting rotary encoder b gpio pin to input").into_input();
+            let rotenc_a_pin = gpio.get(rotary_encoder_pin_ids.0).expect("Failed setting rotary encoder a gpio pin to input").into_input();
+            let rotenc_b_pin = gpio.get(rotary_encoder_pin_ids.1).expect("Failed setting rotary encoder b gpio pin to input").into_input();
 
             let mut last_clk_state = Level::High;
 
@@ -69,7 +69,7 @@ impl InputHandler {
             }
         });
 
-        InputHandler { rx, button_pins, rotary_encoder_thread }
+        InputHandler { rx, _button_pins, _rotary_encoder_thread }
     }
 
     pub fn handle_events(&mut self, mut callback: impl FnMut(InputEvent) ) {
