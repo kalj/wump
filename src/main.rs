@@ -45,10 +45,6 @@ const BUTTONS: &[u8] = &[BUTTON_A, BUTTON_B, BUTTON_C, BUTTON_ROT];
 const ROTENC_A: u8 = 15;
 const ROTENC_B: u8 = 14;
 
-const OLED_DC_PIN_ID: u8  = 24;
-const OLED_RST_PIN_ID: u8 = 23;
-const OLED_SPI_BUS: rppal::spi::Bus        = rppal::spi::Bus::Spi0;
-const OLED_SPI_SS: rppal::spi::SlaveSelect = rppal::spi::SlaveSelect::Ss1;
 
 #[derive(Copy, Clone)]
 struct Fade {
@@ -88,13 +84,13 @@ fn main()
 
     let mut input_handler = InputHandler::new(BUTTONS, (ROTENC_A, ROTENC_B));
 
-    let webui = start_webui(state.alarm.clone());
+    let _webui = start_webui(state.alarm.clone());
 
     // Create and initialize display
     let mut dpy = Display::new().unwrap();
 
     // Send some test
-    dpy.set_top_line("Wake-Up MP 0.4").unwrap();
+    dpy.set_top_line("Wake-Up MP 0.5").unwrap();
     dpy.set_bottom_line("Starting up...").unwrap();
 
     // 1 second delay

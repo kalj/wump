@@ -2,7 +2,7 @@ extern crate rppal;
 extern crate spidev;
 
 use self::spidev::{Spidev, SpidevOptions, SpiModeFlags, SpidevTransfer};
-use self::rppal::gpio::{OutputPin, Gpio, Level};
+use self::rppal::gpio::{OutputPin, Gpio};
 
 use crate::fontmap::FontBitmapSet;
 
@@ -47,7 +47,7 @@ const MCP23S17_OLATB:     u8 = 0x15;
 
 struct MCP23S17 {
     spi: Spidev,
-    cs_pin: OutputPin,
+    _cs_pin: OutputPin,
     rst_pin: OutputPin
 }
 
@@ -69,7 +69,7 @@ impl MCP23S17 {
             .build();
         spi.configure(&options)?;
 
-        Ok(MCP23S17{ spi, cs_pin, rst_pin})
+        Ok(MCP23S17{ spi, _cs_pin:cs_pin, rst_pin})
     }
 
     fn reset(&mut self) {
