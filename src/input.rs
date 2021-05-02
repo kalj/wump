@@ -53,15 +53,12 @@ impl InputHandler {
 
             loop {
                 let aval = rotenc_a_pin.read();
-                match aval {
-                    Level::High => if last_clk_state == Level::Low {
-                        if let Level::Low = rotenc_b_pin.read() {
-                            tx_rotenc.send(InputEvent::RotaryEncoder(1)).unwrap();
-                        } else {
-                            tx_rotenc.send(InputEvent::RotaryEncoder(-1)).unwrap();
-                        }
-                    },
-                    _  => {}
+                if aval == Level::High && last_clk_state == Level::Low {
+                    if let Level::Low = rotenc_b_pin.read() {
+                        tx_rotenc.send(InputEvent::RotaryEncoder(1)).unwrap();
+                    } else {
+                        tx_rotenc.send(InputEvent::RotaryEncoder(-1)).unwrap();
+                    }
                 }
                 last_clk_state = aval;
 

@@ -71,23 +71,23 @@ fn create_page(alarm: &Alarm) -> String {
 
     let context = Context {
         alarm_enabled_checked: (if alarm.is_enabled() { "checked" } else { "" }).to_string(),
-        alarm_mode_onetime_checked: alarm_mode_onetime_checked,
-        alarm_mode_recurring_checked: alarm_mode_recurring_checked,
-        alarm_daymask_disabled: alarm_daymask_disabled,
-        alarm_daymask_mon_checked: alarm_daymask_mon_checked,
-        alarm_daymask_tue_checked: alarm_daymask_tue_checked,
-        alarm_daymask_wed_checked: alarm_daymask_wed_checked,
-        alarm_daymask_thu_checked: alarm_daymask_thu_checked,
-        alarm_daymask_fri_checked: alarm_daymask_fri_checked,
-        alarm_daymask_sat_checked: alarm_daymask_sat_checked,
-        alarm_daymask_sun_checked: alarm_daymask_sun_checked,
+        alarm_mode_onetime_checked,
+        alarm_mode_recurring_checked,
+        alarm_daymask_disabled,
+        alarm_daymask_mon_checked,
+        alarm_daymask_tue_checked,
+        alarm_daymask_wed_checked,
+        alarm_daymask_thu_checked,
+        alarm_daymask_fri_checked,
+        alarm_daymask_sat_checked,
+        alarm_daymask_sun_checked,
         alarm_time:                alarm.get_time().to_str(),
         alarm_fade_length_s:       Number::from_f64(alarm.get_length().num_seconds() as f64).unwrap(),
         alarm_start_vol:           Number::from_f64((alarm.get_start_vol()*100.0).round() as f64).unwrap(),
         alarm_end_vol:             Number::from_f64((alarm.get_end_vol()*100.0).round() as f64).unwrap(),
     };
 
-    return tt.render("form", &context).expect("Failed rendering template");
+    tt.render("form", &context).expect("Failed rendering template")
 }
 
 pub fn start_webui(alarm: Arc<RwLock<Alarm>>) -> thread::JoinHandle<()> {

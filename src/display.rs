@@ -77,14 +77,20 @@ impl MCP23S17 {
     }
 
     fn write_reg(&mut self, addr: u8, val: u8) -> io::Result<()> {
-        self.spi.write(&[MCP23S17_WRITECMD, addr, val])?;
+        let n_written = self.spi.write(&[MCP23S17_WRITECMD, addr, val])?;
+        if n_written != 3 {
+            return Err(io::Error::new(io::ErrorKind::Other, format!("Wrong number of bytes written ({} instead of {})", n_written, 3)));
+        }
         Ok(())
     }
 
     fn write_reg_rep(&mut self, addr: u8, val: &[u8]) -> io::Result<()> {
         let mut tx = vec![MCP23S17_WRITECMD, addr];
         tx.extend_from_slice(val);
-        self.spi.write(&tx)?;
+        let n_written = self.spi.write(&tx)?;
+        if n_written != tx.len() {
+            return Err(io::Error::new(io::ErrorKind::Other, format!("Wrong number of bytes written ({} instead of {})", n_written, tx.len())));
+        }
         Ok(())
     }
 
@@ -330,8 +336,8 @@ impl Lcd128x64 {
 
             self.dev.set_page(chip, row as u8)?;
             self.dev.set_addr(chip, col as u8)?;
-            for j in 0..chip_n_bytes {
-                self.dev.write_data(chip, bytes[j])?;
+            for byte in bytes.iter().take(chip_n_bytes) {
+                self.dev.write_data(chip, *byte)?;
             }
             n_written = chip_n_bytes;
         }
@@ -552,7 +558,7 @@ impl TextCanvas {
                                       "canvas height must be greater than or equal to font height"));
         }
 
-        Ok(TextCanvas { bmpset:bmpset.clone(), upper_left, lower_right })
+        Ok(TextCanvas { bmpset:*bmpset, upper_left, lower_right })
     }
 
     fn width(&self) -> usize {

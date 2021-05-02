@@ -7,6 +7,7 @@ extern crate mpd;
 use std::time::Duration;
 use std::thread;
 use std::sync::{RwLock,Arc};
+use std::cmp::Ordering;
 
 use chrono::{Local, DateTime};
 
@@ -136,10 +137,10 @@ fn main()
             }
 
             if let InputEvent::RotaryEncoder(inc) = x {
-                if inc > 0 {
-                    println!("Rotary encoder turned clockwise");
-                } else if inc < 0 {
-                    println!("Rotary encoder turned counter-clockwise");
+                match inc.cmp(&0) {
+                    Ordering::Greater => println!("Rotary encoder turned clockwise"),
+                    Ordering::Less => println!("Rotary encoder turned counter-clockwise"),
+                    Ordering::Equal => ()
                 }
                 vol_change += inc;
             }
@@ -165,13 +166,10 @@ fn main()
         {
             let mut alarm = state.alarm.write().unwrap();
             if alarm.should_start(&now) {
-                match state.pb_state {
-                    PlaybackState::Paused => {
-                        println!("Starting up the alarm!");
-                        alarm.start();
-                        state.pb_state=PlaybackState::Fading(Fade::new(now,&alarm));
-                    }
-                    _ => {}
+                if let PlaybackState::Paused = state.pb_state {
+                    println!("Starting up the alarm!");
+                    alarm.start();
+                    state.pb_state=PlaybackState::Fading(Fade::new(now,&alarm));
                 }
             }
         }
@@ -221,9 +219,8 @@ fn main()
                 PlaybackState::Playing|PlaybackState::Fading(_) => mpd_conn.play().expect("Failed sending play command to mpd."),
                 _ => ()
             },
-            mpd::State::Play => match state.pb_state {
-                PlaybackState::Paused => mpd_conn.pause(true).expect("Failed sending pause command to mpd."),
-                _ => ()
+            mpd::State::Play => if let PlaybackState::Paused = state.pb_state {
+                mpd_conn.pause(true).expect("Failed sending pause command to mpd.")
             }
         };
 

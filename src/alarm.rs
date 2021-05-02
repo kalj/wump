@@ -12,13 +12,13 @@ pub struct Time {
 
 impl Time {
     pub fn new(hour: u8, min: u8) -> Time {
-        Time { hour: hour, min: min }
+        Time { hour, min }
     }
     pub fn from_str(s: &str) -> Time {
-        let mut time_iter = s.split(":");
+        let mut time_iter = s.split(':');
         let hour = time_iter.next().unwrap().parse::<u8>().unwrap();
         let min  = time_iter.next().unwrap().parse::<u8>().unwrap();
-        Time {hour: hour, min: min }
+        Time {hour, min }
     }
     pub fn to_str(&self) -> String {
         format!("{:02}:{:02}",self.hour,self.min)
@@ -75,12 +75,12 @@ pub struct Alarm {
 
 impl Alarm {
     pub fn new(enabled: bool, time: Time, length_s: i64, start_vol: f32, end_vol: f32, mode: AlarmMode) -> Alarm {
-        Alarm { enabled: enabled,
-                time: time,
+        Alarm { enabled,
+                time,
                 length: Duration::seconds(length_s),
-                start_vol: start_vol,
-                end_vol: end_vol,
-                mode: mode }
+                start_vol,
+                end_vol,
+                mode }
     }
 
     pub fn to_str(&self) -> String {
