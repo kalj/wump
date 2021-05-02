@@ -1,17 +1,15 @@
 extern crate rppal;
 extern crate spidev;
+extern crate bitmap_font;
 
 use self::spidev::{Spidev, SpidevOptions, SpiModeFlags, SpidevTransfer};
 use self::rppal::gpio::{OutputPin, Gpio};
-
-use crate::fontmap::FontBitmapSet;
 
 use std::io::Write;
 use std::io;
 use std::thread;
 use std::time::Duration;
 use std::cmp::min;
-use std::collections::HashSet;
 use chrono::{DateTime, Local};
 
 
@@ -534,28 +532,27 @@ impl BufferedLcd {
 }
 
 struct TextCanvas {
-    bmpset: FontBitmapSet,
+    bmpset: bitmap_font::BitmapFont,
     upper_left: [usize; 2],
     lower_right: [usize; 2]
 }
 
 impl TextCanvas {
-    fn new(font_data: &[u8], charset_opt: Option<&HashSet<char>>, upper_left: [usize; 2], lower_right: [usize; 2]) -> TextCanvas {
+    fn new(bmpset: &bitmap_font::BitmapFont, upper_left: [usize; 2], lower_right: [usize; 2]) -> io::Result<TextCanvas> {
 
         if upper_left[0] >= lower_right[0] || upper_left[1] >= lower_right[1] {
-            panic!("`upper_left` must be strictly to the left and above `lower_right`");
+            return Err(io::Error::new(io::ErrorKind::Other,
+                                      "`upper_left` must be strictly to the left and above `lower_right`"));
         }
 
-        let font_size = (lower_right[1]-upper_left[1]) as u32;
+        let canvas_height = (lower_right[1]-upper_left[1]) as u32;
 
-        let bmpset =
-            if let Some(charset) = charset_opt {
-                FontBitmapSet::new_with_charset(font_data, font_size, charset)
-            } else {
-                FontBitmapSet::new(font_data, font_size)
-            };
+        if canvas_height < bmpset.height() {
+            return Err(io::Error::new(io::ErrorKind::Other,
+                                      "canvas height must be greater than or equal to font height"));
+        }
 
-        TextCanvas { bmpset, upper_left, lower_right }
+        Ok(TextCanvas { bmpset:bmpset.clone(), upper_left, lower_right })
     }
 
     fn width(&self) -> usize {
@@ -568,7 +565,9 @@ impl TextCanvas {
 
     fn render_text(&self, dpy: &mut BufferedLcd, text: &str) -> io::Result<()> {
 
-        let text_width = text.len()*(self.bmpset.glyph_width() as usize);
+        let char_width = self.bmpset.width() as usize;
+        let char_height = self.bmpset.height() as usize;
+        let text_width = text.len()*char_width;
 
         if text_width > self.width() {
             return Err(io::Error::new(io::ErrorKind::Other, format!("Text is too long to fit in canvas width ({} vs {})", text_width, self.width())));
@@ -579,19 +578,15 @@ impl TextCanvas {
 
         for (i_char,ch) in text.chars().enumerate() {
 
-            let char_width = self.bmpset.glyph_width() as usize;
-
-            for i_row in 0..self.height() {
+            for i_row in 0..char_height {
                 for i_col_in_char in 0..char_width {
                     let i_col = left_padding + i_char*char_width + i_col_in_char;
-                    bits.set(i_row,i_col,self.bmpset.get(ch, i_row as u32, i_col_in_char as u32));
+                    bits.set(i_row,i_col,self.bmpset.pixel(ch, i_col_in_char as u32, i_row as u32));
                 }
             }
         }
 
-        dpy.set_bits_at(self.upper_left[1], self.upper_left[0], &bits, false)?;
-
-        dpy.write_back().unwrap();
+        dpy.set_bits_at(self.upper_left[1], self.upper_left[0], &bits, true)?;
 
         Ok(())
     }
@@ -611,12 +606,10 @@ impl Display {
     {
         let dev = BufferedLcd::new()?;
 
-        let font_data = include_bytes!("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf");
 
-        let time_chars: HashSet<_> = "0123456789:".chars().collect();
-        let clock_canvas = TextCanvas::new(font_data, Some(&time_chars), [0, 16], [128, 48]);
-        let top_canvas = TextCanvas::new(font_data, None, [0, 0], [128, 11]);
-        let bottom_canvas = TextCanvas::new(font_data, None, [0, 48], [128, 59]);
+        let clock_canvas = TextCanvas::new(&bitmap_font::FONT_16x32, [0, 16], [128, 48])?;
+        let top_canvas = TextCanvas::new(&bitmap_font::FONT_7x13, [0, 0], [128, 16])?;
+        let bottom_canvas = TextCanvas::new(&bitmap_font::FONT_7x13, [0, 48], [128, 64])?;
 
         Ok(Display { dev, clock_canvas, top_canvas, bottom_canvas })
     }
