@@ -6,8 +6,8 @@ use self::chrono::{DateTime,  Weekday, Duration, Local, Timelike, Datelike};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Time {
-    hour : u8,
-    min : u8
+    hour: u8,
+    min:  u8,
 }
 
 impl Time {
@@ -18,14 +18,12 @@ impl Time {
         let mut time_iter = s.split(':');
         let hour = time_iter.next().unwrap().parse::<u8>().unwrap();
         let min  = time_iter.next().unwrap().parse::<u8>().unwrap();
-        Time {hour, min }
+        Time { hour, min }
     }
     pub fn to_str(&self) -> String {
-        format!("{:02}:{:02}",self.hour,self.min)
+        format!("{:02}:{:02}", self.hour, self.min)
     }
 }
-
-
 
 bitflags! {
     pub struct DayMask: u8 {
@@ -60,56 +58,45 @@ impl DayMask {
 #[derive(Copy, Clone)]
 pub enum AlarmMode {
     OneTime,
-    Recurring(DayMask)
+    Recurring(DayMask),
 }
 
 #[derive(Copy, Clone)]
 pub struct Alarm {
-    enabled   : bool,
-    time      : Time,
-    length    : Duration,
-    start_vol : f32,
-    end_vol   : f32,
-    mode      : AlarmMode,
+    enabled:   bool,
+    time:      Time,
+    length:    Duration,
+    start_vol: f32,
+    end_vol:   f32,
+    mode:      AlarmMode,
 }
 
 impl Alarm {
     pub fn new(enabled: bool, time: Time, length_s: i64, start_vol: f32, end_vol: f32, mode: AlarmMode) -> Alarm {
-        Alarm { enabled,
-                time,
-                length: Duration::seconds(length_s),
-                start_vol,
-                end_vol,
-                mode }
+        Alarm { enabled, time, length: Duration::seconds(length_s), start_vol, end_vol, mode }
     }
 
     pub fn to_str(&self) -> String {
         if self.enabled {
             match self.mode {
                 AlarmMode::OneTime => {
-                    format!("{} (1 time)",self.time.to_str())
-                },
+                    format!("{} (1 time)", self.time.to_str())
+                }
                 AlarmMode::Recurring(dm) => {
-                    if dm==DayMask::from_bits_truncate(0b0001_1111) {
-                        format!("{} (M-F)",self.time.to_str())
-                    }
-                    else {
+                    if dm == DayMask::from_bits_truncate(0b0001_1111) {
+                        format!("{} (M-F)", self.time.to_str())
+                    } else {
                         let mut mask = String::from("[");
                         for i in 0..7 {
-                            let next_char = if dm.contains(DayMask::from_bits_truncate(1<<i)) {
-                                'x'
-                            } else {
-                                ' '
-                            };
+                            let next_char = if dm.contains(DayMask::from_bits_truncate(1 << i)) { 'x' } else { ' ' };
                             mask.push(next_char);
                         }
                         mask.push(']');
-                        format!("{} ({})",self.time.to_str(),mask)
+                        format!("{} ({})", self.time.to_str(), mask)
                     }
                 }
             }
-        }
-        else {
+        } else {
             "Disabled".to_string()
         }
     }
@@ -131,28 +118,29 @@ impl Alarm {
     }
 
     pub fn is_enabled(&self) -> bool {
-         self.enabled
+        self.enabled
     }
 
     pub fn toggle_enabled(&mut self) {
-         self.enabled = !self.enabled;
+        self.enabled = !self.enabled;
     }
 
     pub fn get_time(&self) -> Time {
-         self.time
+        self.time
     }
 
     pub fn should_start(&self, datetime: &DateTime<Local>) -> bool {
-        if !self.enabled ||
-            datetime.second() != 0 ||
-            datetime.hour() != self.time.hour as u32 ||
-            datetime.minute() != self.time.min as u32 {
+        if !self.enabled
+            || datetime.second() != 0
+            || datetime.hour() != self.time.hour as u32
+            || datetime.minute() != self.time.min as u32
+        {
             return false;
         }
 
         match self.mode {
             AlarmMode::OneTime => true,
-            AlarmMode::Recurring(mask) => mask.contains_dow(datetime.weekday())
+            AlarmMode::Recurring(mask) => mask.contains_dow(datetime.weekday()),
         }
     }
 
