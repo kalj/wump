@@ -31,9 +31,9 @@ use webui::start_webui;
 // purpose.
 
 // Button pins
-const BUTTON_A: u8   = 22; // Red
-const BUTTON_B: u8   = 27; // Green
-const BUTTON_C: u8   = 17; // Yellow
+const BUTTON_A: u8   = 27; // Red   (alarm)
+const BUTTON_B: u8   = 17; // Black (play/pause)
+const BUTTON_C: u8   = 22; // White (light)
 const BUTTON_ROT: u8 = 4;  // Rotary encoder
 
 // const MUTE_PIN: u8 = 16;
