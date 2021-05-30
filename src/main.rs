@@ -96,6 +96,11 @@ fn main()
     // 1 second delay
     thread::sleep(Duration::new(1,0));
 
+    // clear any initial events:
+    input_handler.handle_events(|x| {
+        println!("Ignoring event {:?}...", x);
+    });
+
     let dim_timeout : chrono::Duration = chrono::Duration::seconds(5);
     let mut last_input_activity = Local::now();
 

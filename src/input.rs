@@ -5,6 +5,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
+#[derive(Debug, Copy, Clone)]
 pub enum InputEvent {
     Button(u8),
     RotaryEncoder(i8),
