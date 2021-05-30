@@ -11,6 +11,7 @@ use std::io;
 use std::thread;
 use std::sync::{Arc,RwLock};
 
+use config::Config;
 use alarm::Alarm;
 use alarm::AlarmMode;
 use alarm::DayMask;
@@ -90,7 +91,7 @@ fn create_page(alarm: &Alarm) -> String {
     tt.render("form", &context).expect("Failed rendering template")
 }
 
-pub fn start_webui(alarm: Arc<RwLock<Alarm>>) -> thread::JoinHandle<()> {
+pub fn start_webui(config: Arc<RwLock<Config>>) -> thread::JoinHandle<()> {
     thread::spawn( || {
         println!("Starting web UI server listening on 0.0.0.0:8000");
 
@@ -100,7 +101,7 @@ pub fn start_webui(alarm: Arc<RwLock<Alarm>>) -> thread::JoinHandle<()> {
 
                 router!(request,
                         (GET) (/) => {
-                            let page = create_page(&alarm.read().unwrap());
+                            let page = create_page(&config.read().unwrap().alarm);
                             rouille::Response::html(page)
                         },
 
@@ -147,13 +148,12 @@ pub fn start_webui(alarm: Arc<RwLock<Alarm>>) -> thread::JoinHandle<()> {
                                 AlarmMode::OneTime
                             };
 
-                            let mut alarm = alarm.write().unwrap();
-                            *alarm = Alarm::new(data.alarm_enabled,
-                                                Time::from_str(&data.alarm_time),
-                                                data.alarm_fade_length_s,
-                                                (data.alarm_start_vol as f32)/100.0,
-                                                (data.alarm_end_vol as f32)/100.0,
-                                                mode);
+                            config.write().unwrap().alarm = Alarm::new(data.alarm_enabled,
+                                                                       Time::from_str(&data.alarm_time),
+                                                                       data.alarm_fade_length_s,
+                                                                       (data.alarm_start_vol as f32)/100.0,
+                                                                       (data.alarm_end_vol as f32)/100.0,
+                                                                       mode);
 
 
                             // We just print what was received on stdout. Of course in a real application

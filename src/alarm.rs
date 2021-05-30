@@ -1,10 +1,13 @@
 extern crate bitflags;
 extern crate chrono;
+extern crate serde;
 
 use self::bitflags::bitflags;
 use self::chrono::{DateTime,  Weekday, Duration, Local, Timelike, Datelike};
 
-#[derive(Debug, Copy, Clone)]
+use self::serde::{Deserialize, Serialize};
+
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct Time {
     hour: u8,
     min:  u8,
@@ -26,6 +29,7 @@ impl Time {
 }
 
 bitflags! {
+    #[derive(Deserialize, Serialize)]
     pub struct DayMask: u8 {
         const MONDAY =    0b0000_0001;
         const TUESDAY =   0b0000_0010;
@@ -55,25 +59,31 @@ impl DayMask {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub enum AlarmMode {
     OneTime,
     Recurring(DayMask),
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct Alarm {
     enabled:   bool,
     time:      Time,
-    length:    Duration,
+    length_s:  i64,
     start_vol: f32,
     end_vol:   f32,
     mode:      AlarmMode,
 }
 
+impl Default for Alarm {
+    fn default() -> Self {
+        Self {enabled: true, time: Time::new(6,45), length_s: 10, start_vol: 0.1, end_vol: 0.7, mode: AlarmMode::Recurring(DayMask::default()) }
+    }
+}
+
 impl Alarm {
     pub fn new(enabled: bool, time: Time, length_s: i64, start_vol: f32, end_vol: f32, mode: AlarmMode) -> Alarm {
-        Alarm { enabled, time, length: Duration::seconds(length_s), start_vol, end_vol, mode }
+        Alarm { enabled, time, length_s, start_vol, end_vol, mode }
     }
 
     pub fn to_str(&self) -> String {
@@ -102,7 +112,7 @@ impl Alarm {
     }
 
     pub fn get_length(&self) -> Duration {
-        self.length
+        Duration::seconds(self.length_s)
     }
 
     pub fn get_start_vol(&self) -> f32 {

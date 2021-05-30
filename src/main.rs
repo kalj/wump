@@ -18,13 +18,12 @@ mod display;
 mod input;
 mod alarm;
 mod webui;
+mod config;
 
 use display::Display;
 use input::{InputHandler,InputEvent};
 use alarm::Alarm;
-use alarm::AlarmMode;
-use alarm::DayMask;
-use alarm::Time;
+use config::Config;
 use webui::start_webui;
 
 // Pin usage of Hifiberry Miniamp:
@@ -74,20 +73,28 @@ enum PlaybackState {
 }
 
 struct State {
-    alarm: Arc<RwLock<Alarm>>,
     pb_state: PlaybackState,
 }
 
 fn main()
 {
-    let mut state = State { alarm:    Arc::new(RwLock::new(Alarm::new(true, Time::new(6,45),
-                                                                      10, 0.1, 0.7,
-                                                                      AlarmMode::Recurring(DayMask::default())))),
-                            pb_state: PlaybackState::Paused};
+    let config_fname = "wump.conf";
+
+    let mut config = Arc::new(RwLock::new(match Config::read_new(config_fname) {
+        Ok(c) => {
+            println!("Reading config from file at {}", config_fname);
+            c
+        },
+        Err(e) => {
+            println!("No config file found at {}", config_fname);
+            Config::default()
+        }
+    }));
+    let mut state = State { pb_state: PlaybackState::Paused};
 
     let mut input_handler = InputHandler::new(BUTTONS, (ROTENC_A, ROTENC_B));
 
-    let _webui = start_webui(state.alarm.clone());
+    let _webui = start_webui(config.clone());
 
     // Create and initialize display
     let mut dpy = Display::new().unwrap();
@@ -175,16 +182,20 @@ fn main()
         // handle input events and alarm state changes
 
         if input_toggle_alarm_enabled {
-            state.alarm.write().unwrap().toggle_enabled();
+            let mut cfg = config.write().unwrap();
+            cfg.alarm.toggle_enabled();
+            cfg.write(config_fname).unwrap();
         }
 
         {
-            let mut alarm = state.alarm.write().unwrap();
-            if alarm.should_start(&now) {
+            let mut cfg = config.write().unwrap();
+
+            if cfg.alarm.should_start(&now) {
                 if let PlaybackState::Paused = state.pb_state {
                     println!("Starting up the alarm!");
-                    alarm.start();
-                    state.pb_state=PlaybackState::Fading(Fade::new(now,&alarm));
+                    cfg.alarm.start();
+                    state.pb_state=PlaybackState::Fading(Fade::new(now,&cfg.alarm));
+                    cfg.write(config_fname).unwrap();
                 }
             }
         }
@@ -252,7 +263,7 @@ fn main()
 
         let pbstring = if let PlaybackState::Paused = state.pb_state { "Paused" } else { "Playing" };
         let l1 = format!("Vol: {}    {}", volume, pbstring);
-        let alarm_str = state.alarm.read().unwrap().to_str();
+        let alarm_str = config.read().unwrap().alarm.to_str();
         let l2 = format!("Alarm: {}", alarm_str);
 
         dpy.show_time(&now).unwrap();
