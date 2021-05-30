@@ -1,4 +1,3 @@
-extern crate bitmap_font;
 extern crate rppal;
 extern crate spidev;
 extern crate bitmap_font;
@@ -485,6 +484,10 @@ impl BufferedLcd {
         Ok(obj)
     }
 
+    pub fn clear(&mut self) -> io::Result<()> {
+        self.dev.clear()
+    }
+
     pub fn set_bits_at(&mut self, row: usize, col: usize, bits: &Vec2d, wb: bool) -> io::Result<()> {
 
         if (row+bits.height()) > LCD_HEIGHT || (col+bits.width()) >LCD_WIDTH {
@@ -628,6 +631,12 @@ impl Display {
         let bottom_canvas = TextCanvas::new(&bitmap_font::FONT_7x13, [0, 48], [128, 64])?;
 
         Ok(Display { dev, clock_canvas, top_canvas, bottom_canvas })
+    }
+
+    pub fn clear(&mut self) -> io::Result<()> {
+        self.clock_canvas.render_text(&mut self.dev, "")?;
+        self.top_canvas.render_text(&mut self.dev, "")?;
+        self.bottom_canvas.render_text(&mut self.dev, "")
     }
 
     pub fn get_backlight(&mut self) -> bool {
