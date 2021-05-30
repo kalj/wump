@@ -3,11 +3,14 @@
 extern crate rouille;
 extern crate chrono;
 extern crate mpd;
+extern crate signal_hook;
 
 use std::time::Duration;
 use std::thread;
-use std::sync::{RwLock,Arc};
 use std::cmp::Ordering;
+use std::sync::{RwLock,Arc};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering as SyncOrdering;
 
 use chrono::{Local, DateTime};
 
@@ -104,7 +107,11 @@ fn main()
     let dim_timeout : chrono::Duration = chrono::Duration::seconds(5);
     let mut last_input_activity = Local::now();
 
-    loop {
+    let mut terminate = Arc::new(AtomicBool::new(false));
+    signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&terminate)).unwrap();
+    signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&terminate)).unwrap();
+
+    while !terminate.load(SyncOrdering::Relaxed) {
         let now : DateTime<Local> = Local::now();
         let mut mpd_conn = mpd::Client::connect("127.0.0.1:6600").expect("Failed connecting to mpd");
         let mpd_status = mpd_conn.status().expect("Failed querying mpd for status");
@@ -139,6 +146,7 @@ fn main()
 
             if let InputEvent::Button(BUTTON_ROT) = x {
                 println!("Rotary encoder button pressed");
+                terminate.store(true,SyncOrdering::Relaxed);
             }
 
             if let InputEvent::RotaryEncoder(inc) = x {
@@ -251,4 +259,9 @@ fn main()
 
         thread::sleep(Duration::from_millis(250));
     }
+
+    dpy.clear().unwrap();
+    println!("Exiting...");
+    dpy.set_top_line("Wump exiting...").unwrap();
+    thread::sleep(Duration::new(1,0));
 }

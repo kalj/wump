@@ -3,6 +3,7 @@ name = "wump"
 version = "0.5.0"
 
 [dependencies]
+signal-hook  = "*"
 chrono       = "*"
 mpd          = "*"
 bitflags     = "*"
