@@ -110,6 +110,7 @@ fn main()
     let mut terminate = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&terminate)).unwrap();
     signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&terminate)).unwrap();
+    let mut do_poweroff = false;
 
     while !terminate.load(SyncOrdering::Relaxed) {
         let now : DateTime<Local> = Local::now();
@@ -147,6 +148,7 @@ fn main()
             if let InputEvent::Button(BUTTON_ROT) = x {
                 println!("Rotary encoder button pressed");
                 terminate.store(true,SyncOrdering::Relaxed);
+                do_poweroff = true;
             }
 
             if let InputEvent::RotaryEncoder(inc) = x {
@@ -261,7 +263,20 @@ fn main()
     }
 
     dpy.clear().unwrap();
-    println!("Exiting...");
-    dpy.set_top_line("Wump exiting...").unwrap();
-    thread::sleep(Duration::new(1,0));
+
+    if do_poweroff {
+        dpy.set_top_line("Shutting down...").unwrap();
+        let output = std::process::Command::new("sudo").arg("poweroff").output().unwrap();
+        println!("Poweroff returned with status: {}", output.status);
+        println!("output: {}", std::str::from_utf8(&output.stdout).unwrap());
+        dpy.set_bottom_line("poweroff returned.").unwrap();
+        loop {
+            println!("sleeping...");
+            thread::sleep(Duration::new(1,0));
+        }
+    } else {
+        println!("Exiting...");
+        dpy.set_top_line("Wump exiting...").unwrap();
+        thread::sleep(Duration::new(1,0));
+    }
 }
