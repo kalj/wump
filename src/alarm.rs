@@ -90,18 +90,17 @@ impl Alarm {
         if self.enabled {
             match self.mode {
                 AlarmMode::OneTime => {
-                    format!("{} (1 time)", self.time.to_str())
+                    format!("{} (1-time)", self.time.to_str())
                 }
                 AlarmMode::Recurring(dm) => {
                     if dm == DayMask::from_bits_truncate(0b0001_1111) {
                         format!("{} (M-F)", self.time.to_str())
                     } else {
-                        let mut mask = String::from("[");
+                        let mut mask = String::new();
                         for i in 0..7 {
-                            let next_char = if dm.contains(DayMask::from_bits_truncate(1 << i)) { 'x' } else { ' ' };
+                            let next_char = if dm.contains(DayMask::from_bits_truncate(1 << i)) { 'x' } else { '.' };
                             mask.push(next_char);
                         }
-                        mask.push(']');
                         format!("{} ({})", self.time.to_str(), mask)
                     }
                 }

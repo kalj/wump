@@ -593,7 +593,7 @@ impl TextCanvas {
         if text_width > self.width() {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
-                format!("Text is too long to fit in canvas width ({} vs {})", text_width, self.width()),
+                format!("Text is too long to fit in canvas width ({} vs {}, text: {})", text_width, self.width(), text),
             ));
         }
 

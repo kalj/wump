@@ -264,7 +264,7 @@ fn main()
         let pbstring = if let PlaybackState::Paused = state.pb_state { "Paused" } else { "Playing" };
         let l1 = format!("Vol: {}    {}", volume, pbstring);
         let alarm_str = config.read().unwrap().alarm.to_str();
-        let l2 = format!("Alarm: {}", alarm_str);
+        let l2 = format!("A: {}", alarm_str);
 
         dpy.show_time(&now).unwrap();
         dpy.set_top_line(&l1).unwrap();
